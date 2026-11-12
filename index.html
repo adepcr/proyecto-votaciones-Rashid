@@ -1,0 +1,2727 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistema de Votación ADEP - Asamblea Legislativa</title>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <!-- Firebase App (Core) y Realtime Database SDKs -->
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+    <!-- jsPDF y AutoTable para actas en PDF con tablas -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+
+    <style>
+        :root {
+            --adep-green: #00873E;
+            --adep-red: #E31B23;
+            --adep-white: #FFFFFF;
+            --adep-dark-green: #005c2a;
+            --adep-gold: #D4AF37;
+            --bg-light: #F4F7F6;
+            --text-color: #2D3748;
+            --card-shadow: 0 10px 25px rgba(0,0,0,0.08);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Poppins', sans-serif;
+        }
+
+        body {
+            background-color: var(--bg-light);
+            color: var(--text-color);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .color-bar {
+            height: 8px;
+            width: 100%;
+            background: linear-gradient(90deg, var(--adep-green) 0%, var(--adep-green) 45%, var(--adep-white) 45%, var(--adep-white) 55%, var(--adep-red) 55%, var(--adep-red) 100%);
+        }
+
+        header {
+            background: var(--adep-white);
+            border-bottom: 3px solid var(--adep-green);
+            padding: 15px 30px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+
+        .brand-container {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+
+        .logo-img {
+            width: 75px;
+            height: 75px;
+            object-fit: contain;
+            border-radius: 50%;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+
+        .title-area h1 {
+            color: var(--adep-green);
+            font-size: 1.4rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .title-area h2 {
+            color: var(--adep-red);
+            font-size: 0.95rem;
+            font-weight: 600;
+        }
+
+        .header-right {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            flex-wrap: wrap;
+        }
+
+        .user-badge-bar {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            background: #E8F5E9;
+            padding: 6px 14px;
+            border-radius: 20px;
+            border: 1px solid var(--adep-green);
+            font-size: 0.85rem;
+            color: var(--adep-dark-green);
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .btn-logout {
+            background-color: var(--adep-red);
+            color: white;
+            border: none;
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        .btn-logout:hover { background-color: #991B1B; }
+
+        .live-tag {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: #2e7d32;
+            background: #e8f5e9;
+            padding: 5px 12px;
+            border-radius: 15px;
+        }
+
+        .live-dot {
+            width: 10px;
+            height: 10px;
+            background-color: #2e7d32;
+            border-radius: 50%;
+            animation: pulse 1.5s infinite;
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(46, 125, 50, 0.7); }
+            70% { transform: scale(1); box-shadow: 0 0 0 8px rgba(46, 125, 50, 0); }
+            100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(46, 125, 50, 0); }
+        }
+
+        main {
+            flex: 1;
+            padding: 30px;
+            max-width: 1300px;
+            width: 100%;
+            margin: 0 auto;
+        }
+
+        .nav-questions {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 25px;
+            overflow-x: auto;
+            padding-bottom: 5px;
+        }
+
+        .q-tab {
+            background: white;
+            border: 2px solid #CBD5E0;
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-size: 0.9rem;
+            font-weight: 600;
+            color: #4A5568;
+            cursor: pointer;
+            transition: all 0.2s;
+            white-space: nowrap;
+        }
+        .q-tab.active {
+            background: var(--adep-green);
+            color: white;
+            border-color: var(--adep-green);
+            box-shadow: 0 4px 12px rgba(0, 135, 62, 0.25);
+        }
+        .q-tab.locked {
+            background: #EDF2F7;
+            color: #A0AEC0;
+            border-color: #E2E8F0;
+        }
+
+        .timer-banner {
+            background: linear-gradient(135deg, #00873E 0%, #005c2a 100%);
+            color: white;
+            padding: 15px 25px;
+            border-radius: 12px;
+            margin-bottom: 25px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 6px 15px rgba(0, 135, 62, 0.2);
+            font-weight: 600;
+        }
+        .timer-clock {
+            font-size: 1.5rem;
+            font-weight: 700;
+            background: rgba(255,255,255,0.2);
+            padding: 5px 15px;
+            border-radius: 8px;
+            letter-spacing: 1px;
+        }
+
+        .grid-container {
+            display: grid;
+            grid-template-columns: 1.2fr 1fr;
+            gap: 25px;
+        }
+        @media(max-width: 900px) {
+            .grid-container { grid-template-columns: 1fr; }
+        }
+
+        .card {
+            background: var(--adep-white);
+            border-radius: 16px;
+            box-shadow: var(--card-shadow);
+            padding: 25px;
+            border-top: 5px solid var(--adep-green);
+            margin-bottom: 25px;
+        }
+
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            border-bottom: 2px solid #F1F5F9;
+            padding-bottom: 12px;
+        }
+
+        .card-title {
+            font-size: 1.15rem;
+            font-weight: 700;
+            color: var(--adep-dark-green);
+        }
+
+        .question-box {
+            background: #F8FAFC;
+            border-left: 4px solid var(--adep-green);
+            padding: 16px;
+            border-radius: 8px;
+            margin-bottom: 12px;
+        }
+        .question-number { font-size: 0.8rem; font-weight: 700; color: var(--adep-green); text-transform: uppercase; margin-bottom: 4px; }
+        .question-text { font-size: 1.05rem; font-weight: 600; color: #2D3748; line-height: 1.5; }
+        
+        /* Autoría con tamaño de tipografía ligeramente mayor y perfectamente visible */
+        .question-author-banner {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: #EDF2F7;
+            padding: 10px 16px;
+            border-radius: 8px;
+            font-size: 0.95rem;
+            font-weight: 700;
+            color: #1A202C;
+            margin-bottom: 20px;
+            border: 1px solid #CBD5E0;
+        }
+
+        .options-container {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+
+        .vote-btn {
+            padding: 15px 20px;
+            border: 2px solid #E2E8F0;
+            border-radius: 10px;
+            background: white;
+            font-size: 1.05rem;
+            font-weight: 700;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: all 0.2s;
+        }
+        .vote-btn:disabled { opacity: 0.65; cursor: not-allowed; transform: none !important; }
+
+        .btn-si { color: var(--adep-green); }
+        .btn-si:hover:not(:disabled) { border-color: var(--adep-green); background: #E8F5E9; transform: translateY(-2px); }
+        .btn-si.selected { border-color: var(--adep-green); background: #E8F5E9; box-shadow: 0 0 0 3px rgba(0, 135, 62, 0.2); }
+
+        .btn-no { color: var(--adep-red); }
+        .btn-no:hover:not(:disabled) { border-color: var(--adep-red); background: #FEE2E2; transform: translateY(-2px); }
+        .btn-no.selected { border-color: var(--adep-red); background: #FEE2E2; box-shadow: 0 0 0 3px rgba(227, 27, 35, 0.2); }
+
+        .btn-abs { color: #64748B; }
+        .btn-abs:hover:not(:disabled) { border-color: #64748B; background: #F1F5F9; transform: translateY(-2px); }
+        .btn-abs.selected { border-color: #64748B; background: #F1F5F9; box-shadow: 0 0 0 3px rgba(100, 116, 139, 0.2); }
+
+        .vote-btn.custom-opt { color: #2D3748; }
+        .vote-btn.custom-opt:hover:not(:disabled) { border-color: #3182CE; background: #EBF8FF; transform: translateY(-2px); }
+        .vote-btn.custom-opt.selected { border-color: #3182CE; background: #3182CE; color: #FFFFFF; box-shadow: 0 0 0 3px rgba(49, 130, 206, 0.3); }
+        .vote-btn.custom-opt.selected span { color: #FFFFFF !important; }
+        .user-status-msg {
+            padding: 12px;
+            border-radius: 8px;
+            font-size: 0.9rem;
+            font-weight: 600;
+            text-align: center;
+            margin-bottom: 15px;
+        }
+        .status-pending { background: #FEF3C7; color: #B45309; border: 1px solid #FDE68A; }
+        .status-voted { background: #DCFCE7; color: #166534; border: 1px solid #BBF7D0; }
+
+        .help-action-box { display: flex; flex-direction: column; gap: 10px; }
+        .btn-help-request {
+            background-color: #FEF3C7; color: #B45309; border: 1px solid #FDE68A; padding: 10px; border-radius: 8px; font-weight: 600; cursor: pointer; font-size: 0.85rem; transition: background 0.2s;
+        }
+        .btn-help-request:hover { background-color: #FDE68A; }
+        .btn-edit-profile {
+            background-color: #E2E8F0; color: #4A5568; border: none; padding: 10px; border-radius: 8px; font-weight: 600; cursor: pointer; font-size: 0.85rem; transition: background 0.2s;
+        }
+        .btn-edit-profile:hover { background-color: #CBD5E0; }
+
+        .stat-box { margin-bottom: 15px; }
+        .stat-header { display: flex; justify-content: space-between; font-size: 0.9rem; font-weight: 700; margin-bottom: 6px; }
+        .stat-bar-bg { background: #E2E8F0; height: 12px; border-radius: 6px; overflow: hidden; }
+        .stat-bar-fill { height: 100%; border-radius: 6px; transition: width 0.4s ease; }
+        .fill-si { background-color: var(--adep-green); }
+        .fill-no { background-color: var(--adep-red); }
+        .fill-abs { background-color: #64748B; }
+        .fill-custom { background-color: #3182CE; }
+        .total-counter { font-size: 1rem; font-weight: 700; color: #2D3748; text-align: center; margin-top: 15px; padding-top: 10px; border-top: 1px solid #E2E8F0; }
+
+        .afiliado-info-box { display: flex; flex-direction: column; gap: 10px; font-size: 0.9rem; margin-bottom: 15px; text-transform: uppercase; }
+        .afiliado-info-item { display: flex; justify-content: space-between; border-bottom: 1px dashed #E2E8F0; padding-bottom: 6px; }
+        .info-label { color: #334155; font-weight: 700; }
+        .info-val { color: #0F172A; font-weight: 800; }
+        .legal-notice { font-size: 0.8rem; color: #334155; line-height: 1.4; background: #F8FAFC; padding: 10px; border-radius: 6px; font-weight: 500; }
+
+        .admin-section { background: white; border-radius: 16px; box-shadow: var(--card-shadow); padding: 25px; border-top: 5px solid var(--adep-dark-green); margin-top: 30px; }
+        .admin-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 15px; }
+        .btn-group-admin { display: flex; gap: 10px; flex-wrap: wrap; }
+        .btn-report { background-color: var(--adep-green); color: white; border: none; padding: 10px 16px; border-radius: 8px; font-weight: 600; cursor: pointer; font-size: 0.9rem; }
+        .btn-reset { background-color: #D69E2E; color: white; border: none; padding: 10px 16px; border-radius: 8px; font-weight: 600; cursor: pointer; font-size: 0.9rem; }
+        .btn-delete { background-color: var(--adep-red); color: white; border: none; padding: 10px 16px; border-radius: 8px; font-weight: 600; cursor: pointer; font-size: 0.9rem; }
+
+        .motion-creator-box { background: #F8FAFC; border: 1px solid #E2E8F0; padding: 20px; border-radius: 12px; margin-top: 20px; }
+        .motion-creator-box h4 { color: var(--adep-dark-green); margin-bottom: 15px; font-size: 1.05rem; }
+
+        .audit-table-container { max-height: 350px; overflow-y: auto; border: 1px solid #E2E8F0; border-radius: 8px; background: white; }
+        .audit-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; text-align: left; }
+        .audit-table th { background: #EDF2F7; color: #2D3748; padding: 10px 12px; font-weight: 700; position: sticky; top: 0; z-index: 10; }
+        .audit-table td { padding: 10px 12px; border-bottom: 1px solid #E2E8F0; color: #4A5568; }
+        .audit-table tr:hover { background: #F8FAFC; }
+
+        .badge-voto { padding: 4px 10px; border-radius: 6px; font-size: 0.75rem; font-weight: 700; display: inline-block; }
+        .badge-si { background: #DCFCE7; color: #166534; }
+        .badge-no { background: #FEE2E2; color: #991B1B; }
+        .badge-abs { background: #F1F5F9; color: #475569; }
+        .badge-custom { background: #EBF8FF; color: #2B6CB0; }
+        .badge-profile { background: #FEF3C7; color: #B45309; }
+        .badge-help { background: #FEF3C7; color: #B45309; }
+        .badge-expired { background: #FEE2E2; color: #991B1B; }
+        .badge-activo { background: #DCFCE7; color: #166534; }
+        .badge-inactivo { background: #F1F5F9; color: #64748B; }
+
+        .btn-enable-vote { background-color: #3182CE; color: white; border: none; padding: 6px 12px; border-radius: 6px; font-size: 0.75rem; font-weight: 600; cursor: pointer; }
+        .btn-delete-vote { background-color: #E53E3E; color: white; border: none; padding: 6px 12px; border-radius: 6px; font-size: 0.75rem; font-weight: 600; cursor: pointer; }
+
+        .loading-screen {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 60px 20px;
+            text-align: center;
+            flex: 1;
+        }
+
+        .spinner {
+            width: 70px;
+            height: 70px;
+            border: 6px solid #E2E8F0;
+            border-top: 6px solid var(--adep-green);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-bottom: 20px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .loading-text { font-size: 1.1rem; font-weight: 600; color: var(--adep-dark-green); }
+
+        .login-wrapper {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 40px 20px;
+            flex: 1;
+        }
+
+        .auth-card {
+            background: var(--adep-white);
+            width: 100%;
+            max-width: 460px;
+            border-radius: 16px;
+            box-shadow: var(--card-shadow);
+            padding: 30px 25px;
+            border-top: 5px solid var(--adep-green);
+            position: relative;
+        }
+
+        .auth-header { text-align: center; margin-bottom: 25px; }
+        .auth-logo { width: 80px; height: 80px; margin-bottom: 12px; object-fit: contain; }
+        .auth-header h3 { color: var(--adep-green); font-size: 1.15rem; font-weight: 700; }
+        .auth-header p { color: #718096; font-size: 0.85rem; }
+
+        .auth-tabs { display: flex; border-bottom: 2px solid #E2E8F0; margin-bottom: 20px; }
+        .auth-tab {
+            flex: 1; padding: 10px 5px; text-align: center; background: none; border: none; font-size: 0.8rem; font-weight: 600; color: #718096; cursor: pointer; border-bottom: 3px solid transparent; transition: all 0.2s;
+        }
+        .auth-tab.active { color: var(--adep-green); border-bottom-color: var(--adep-green); }
+
+        .form-group { margin-bottom: 16px; }
+        .form-group label { display: block; font-size: 0.9rem; font-weight: 700; color: #2D3748; margin-bottom: 6px; }
+        .form-control {
+            width: 100%; padding: 14px 16px; border: 2px solid #CBD5E0; border-radius: 8px; font-size: 1.05rem; outline: none; transition: border-color 0.2s; font-weight: 600;
+        }
+        .form-control:focus { border-color: var(--adep-green); box-shadow: 0 0 0 3px rgba(0, 135, 62, 0.15); }
+
+        textarea.form-control {
+            resize: vertical;
+            min-height: 110px;
+            line-height: 1.5;
+        }
+
+        .btn-submit {
+            width: 100%; background-color: var(--adep-green); color: white; padding: 14px; border: none; border-radius: 8px; font-size: 1.05rem; font-weight: 700; cursor: pointer; transition: background 0.2s; margin-top: 10px;
+        }
+        .btn-submit:hover { background-color: var(--adep-dark-green); }
+        .btn-submit:disabled { background-color: #CBD5E0; cursor: not-allowed; }
+
+        .alert-box { padding: 12px; border-radius: 6px; font-size: 0.9rem; margin-bottom: 15px; display: none; font-weight: 600; }
+        .alert-danger { background-color: #FED7D7; color: #C53030; border: 1px solid #FEB2B2; }
+        .alert-success { background-color: #C6F6D5; color: #22543D; border: 1px solid #9AE6B4; }
+
+        .acreditacion-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); display: none; justify-content: center; align-items: center; z-index: 1100;
+        }
+        .acreditacion-card {
+            background: white; width: 90%; max-width: 450px; padding: 30px; border-radius: 16px; box-shadow: 0 15px 30px rgba(0,0,0,0.3); border-top: 6px solid var(--adep-green); text-align: left; position: relative;
+            max-height: 90vh; overflow-y: auto;
+        }
+        .btn-close-x {
+            position: absolute; top: 15px; right: 15px; background: #FFEBEE; color: var(--adep-red); border: 1px solid #FFCDD2; width: 32px; height: 32px; border-radius: 50%; font-size: 1.1rem; font-weight: 700; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: all 0.2s;
+        }
+        .btn-close-x:hover { background: var(--adep-red); color: white; transform: scale(1.05); }
+
+        .custom-modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); display: none; justify-content: center; align-items: center; z-index: 1000; }
+        .custom-modal { background: white; padding: 25px; border-radius: 12px; width: 90%; max-width: 400px; box-shadow: 0 10px 25px rgba(0,0,0,0.2); text-align: center; }
+        .custom-modal h4 { color: var(--adep-dark-green); margin-bottom: 10px; font-size: 1.1rem; }
+        .custom-modal p { color: #4A5568; font-size: 0.9rem; margin-bottom: 20px; }
+        .modal-buttons { display: flex; gap: 10px; justify-content: center; }
+        .btn-modal-cancel { background-color: #E2E8F0; color: #4A5568; border: none; padding: 8px 16px; border-radius: 6px; font-weight: 600; cursor: pointer; }
+        .btn-modal-confirm { background-color: var(--adep-green); color: white; border: none; padding: 8px 16px; border-radius: 6px; font-weight: 600; cursor: pointer; }
+        .btn-modal-confirm:hover { background-color: var(--adep-dark-green); }
+
+        .app-notification {
+            position: fixed; top: 20px; right: 20px; padding: 12px 20px; border-radius: 8px; color: white; font-weight: 600; z-index: 1200; display: none; box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        }
+        .app-notification.success { background-color: var(--adep-green); }
+        .app-notification.error { background-color: var(--adep-red); }
+
+        /* Pie de página adaptado y limpio */
+        footer { 
+            text-align: center; 
+            padding: 20px; 
+            font-size: 0.85rem; 
+            color: #1A202C; 
+            background: #E2E8F0; 
+            font-weight: 700;
+            border-top: 3px solid #CBD5E0;
+        }
+    </style>
+</head>
+<body>
+    <div class="color-bar"></div>
+    <header>
+        <div class="brand-container">
+            <img src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTEOONBRhmPrMlxu-7KhLL73j9GkvgOf7k4esek3AhPDC2WbUT_r3tladt8&s=10" alt="ADEP Logo" class="logo-img">
+            <div class="title-area">
+                <h1>ADEP</h1>
+                <h2>Asamblea Legislativa - Votación Oficial</h2>
+            </div>
+        </div>
+        <div class="header-right">
+            <div id="userInfoHeader" class="user-badge-bar" style="display: none;">
+                <span id="headerUserName">👤 Usuario</span>
+                <button class="btn-logout" onclick="logout()">Cerrar Sesión</button>
+            </div>
+            <div class="live-tag">
+                <div class="live-dot"></div>
+                <span>Servidor en Vivo (Firebase)</span>
+            </div>
+        </div>
+    </header>
+    <div class="acreditacion-overlay" id="primerRegistroModal">
+        <div class="acreditacion-card">
+            <button class="btn-close-x" onclick="closePrimerRegistroModal()" title="Cancelar">✕</button>
+            <h3 id="modalRegTitle">👋 ¡Bienvenido/a a la Votación!</h3>
+            <p id="modalRegDesc">Se ha verificado su cédula en el padrón oficial. Por favor confirme su nombre y filial para registrar su participación:</p>
+            
+            <div id="regRapidoAlert" class="alert-box" style="margin-bottom: 15px;"></div>
+            <form id="primerRegistroForm" onsubmit="submitPrimerRegistro(event)">
+                <div class="form-group">
+                    <label>👤 Nombre Completo</label>
+                    <input type="text" id="regRapidoName" class="form-control" placeholder="Ej: María Rodríguez" required>
+                </div>
+                <div class="form-group">
+                    <label>🏢 Filial</label>
+                    <input type="text" id="regRapidoProvincia" class="form-control" placeholder="Ej: SAN JOSE" required>
+                </div>
+                <button type="submit" class="btn-submit" id="btnSubmitRegistro">Confirmar e Ingresar</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal para editar información personal -->
+    <div class="acreditacion-overlay" id="editProfileModal">
+        <div class="acreditacion-card">
+            <button class="btn-close-x" onclick="closeEditProfileModal()" title="Cancelar">✕</button>
+            <h3>✏️ Solicitar Actualización de Datos</h3>
+            <p>Envíe una solicitud de cambio de nombre o filial a la Administración para su validación:</p>
+            
+            <form id="editProfileForm" onsubmit="submitEditProfileRequest(event)">
+                <div class="form-group">
+                    <label>👤 Nuevo Nombre Completo</label>
+                    <input type="text" id="editProfileName" class="form-control" required>
+                </div>
+                <div class="form-group">
+                    <label>🏢 Nueva Filial</label>
+                    <input type="text" id="editProfileProvincia" class="form-control" required>
+                </div>
+                <button type="submit" class="btn-submit">Enviar Solicitud a Administración</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal de Administración para Editar Cuenta de Afiliado -->
+    <div class="acreditacion-overlay" id="adminEditAccountModal">
+        <div class="acreditacion-card">
+            <button class="btn-close-x" onclick="closeAdminEditAccountModal()" title="Cancelar">✕</button>
+            <h3>✏️ Editar Cuenta de Afiliado</h3>
+            <p>Modifique los datos del afiliado y guarde los cambios:</p>
+            
+            <form id="adminEditAccountForm" onsubmit="submitAdminEditAccount(event)">
+                <input type="hidden" id="editAccountCedulaOriginal">
+                <div class="form-group">
+                    <label>🪪 Cédula (No modificable)</label>
+                    <input type="text" id="editAccountCedula" class="form-control" disabled style="background:#EDF2F7;">
+                </div>
+                <div class="form-group">
+                    <label>👤 Nombre Completo</label>
+                    <input type="text" id="editAccountName" class="form-control" oninput="checkAccountChanges()" required>
+                </div>
+                <div class="form-group">
+                    <label>🏢 Filial</label>
+                    <input type="text" id="editAccountProvincia" class="form-control" oninput="checkAccountChanges()" required>
+                </div>
+                <div style="display: flex; gap: 10px; margin-top: 15px;">
+                    <button type="button" class="btn-modal-cancel" style="flex: 1; padding: 12px;" onclick="closeAdminEditAccountModal()">Cancelar</button>
+                    <button type="submit" id="btnSaveAccountChanges" class="btn-submit" style="flex: 1; margin-top: 0;" disabled>Guardar Cambios</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal para seleccionar tipo de Acta PDF -->
+    <div class="custom-modal-overlay" id="pdfTypeModal">
+        <div class="custom-modal">
+            <h4>📄 Descargar Acta Oficial PDF</h4>
+            <p>Seleccione el formato de acta que desea generar:</p>
+            <div style="margin-bottom: 20px; text-align: left;">
+                <label style="display: flex; align-items: center; gap: 8px; margin-bottom: 10px; font-weight: 600; cursor: pointer;">
+                    <input type="radio" name="pdfVisibility" value="public" checked> Público (Desglose detallado por Asambleísta)
+                </label>
+                <label style="display: flex; align-items: center; gap: 8px; font-weight: 600; cursor: pointer;">
+                    <input type="radio" name="pdfVisibility" value="private"> Privado (Resumen Ejecutivo y Cuadro Estadístico Anónimo)
+                </label>
+            </div>
+            <div class="modal-buttons">
+                <button class="btn-modal-cancel" onclick="closePdfModal(false)">Cancelar</button>
+                <button class="btn-modal-confirm" onclick="closePdfModal(true)">Generar Acta PDF</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="custom-modal-overlay" id="customModal">
+        <div class="custom-modal">
+            <h4 id="modalTitle">Confirmar Acción</h4>
+            <p id="modalText">¿Está seguro de realizar esta acción?</p>
+            <div class="modal-buttons" id="modalButtonsContainer">
+                <button class="btn-modal-cancel" id="modalCancelBtn" onclick="closeModal(false)">Cancelar</button>
+                <button class="btn-modal-confirm" id="modalConfirmBtn" onclick="closeModal(true)">Acepto</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="login-wrapper" id="authContainer">
+        <div class="auth-card">
+            <div class="auth-header">
+                <img src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTEOONBRhmPrMlxu-7KhLL73j9GkvgOf7k4esek3AhPDC2WbUT_r3tladt8&s=10" alt="ADEP" class="auth-logo">
+                <h3>Asociación de Educadores Pensionados</h3>
+                <p>Portal de Votación Ciudadana y Asamblea</p>
+            </div>
+            
+            <div class="auth-tabs">
+                <button class="auth-tab active" id="tabAfiliado" onclick="switchAuthTab('afiliado')">👤 Afiliado (Votante)</button>
+                <!-- En el login dice únicamente Mesa Directiva como pediste -->
+                <button class="auth-tab" id="tabLoginAdmin" onclick="switchAuthTab('loginAdmin')">🛡️ Mesa Directiva</button>
+            </div>
+            <div id="authAlert" class="alert-box"></div>
+            
+            <form id="afiliadoSimplificadoForm" onsubmit="handleAfiliadoSimplificado(event)">
+                <div class="form-group">
+                    <label>🪪 Ingrese su Número de Cédula</label>
+                    <input type="text" id="afiliadoCedulaInput" class="form-control" placeholder="" maxlength="9" required>
+                </div>
+                <button type="submit" class="btn-submit">Ingresar a Votar</button>
+            </form>
+
+            <form id="loginAdminForm" onsubmit="handleLoginAdmin(event)" style="display: none;">
+                <div class="form-group">
+                    <label>🔑 PIN de Administrador</label>
+                    <input type="password" id="loginAdminPin" class="form-control" placeholder="" maxlength="6" required>
+                </div>
+                <button type="submit" class="btn-submit" style="background-color: var(--adep-red);">Ingresar como Mesa Directiva</button>
+            </form>
+        </div>
+    </div>
+
+    <div class="loading-screen" id="loadingScreen" style="display: none;">
+        <div class="spinner"></div>
+        <div class="loading-text">Conectando a Firebase y sincronizando sistema...</div>
+    </div>
+    <main id="mainApp" style="display: none;">
+        <div id="appNotification" class="app-notification"></div>
+        <div class="nav-questions" id="tabsContainer"></div>
+        
+        <div class="timer-banner" id="afiliadoTimerBanner" style="display: none;">
+            <span id="timerLabelText">⏱️ Tiempo restante para votar:</span>
+            <span class="timer-clock" id="timerClock">01:30</span>
+        </div>
+
+        <div class="grid-container" id="votingMainContainer">
+            <div class="card">
+                <div class="card-header">
+                    <span class="card-title">Papeleta Digital</span>
+                    <span style="font-size:0.85rem; color:#718096; font-weight:600;">Sesión Plenaria</span>
+                </div>
+                <div class="question-box" id="questionBoxWrapper">
+                    <div class="question-number" id="qCategory">Moción 01</div>
+                    <div class="question-text" id="qTitle">Cargando pregunta...</div>
+                </div>
+                <!-- Autoría con tipografía optimizada, clara y visible -->
+                <div class="question-author-banner" id="qAuthor">
+                    <span>📌 Generado por: -</span>
+                </div>
+
+                <div class="options-container" id="optionsCardContainer">
+                    <button class="vote-btn btn-si" id="btnSi" onclick="castVote('si')"><span>SÍ</span><span>👍</span></button>
+                    <button class="vote-btn btn-no" id="btnNo" onclick="castVote('no')"><span>NO</span><span>👎</span></button>
+                    <button class="vote-btn btn-abs" id="btnAbs" onclick="castVote('abstencion')"><span>ABSTENCIÓN</span><span>✋</span></button>
+                </div>
+                <div id="userStatus" class="user-status-msg status-pending">Pendiente: Seleccione su opción para votar.</div>
+                <div class="help-action-box" id="helpActionBox" style="display: none;">
+                    <button class="btn-help-request" id="btnHelpRequest" onclick="requestHelp()" style="display: none;">🆘 ¿Elegiste mal tu opción? Pide ayuda a la Administración</button>
+                    <button class="btn-help-request" id="btnExpiredHelpRequest" onclick="requestHelp()" style="display: none; background-color: #FED7D7; color: #C53030; border-color: #FEB2B2;">🆘 Expiró tu tiempo: Solicitar permiso para votar</button>
+                    <button class="btn-edit-profile" onclick="openEditProfileModal()">✏️ Actualizar mis datos</button>
+                </div>
+            </div>
+
+            <div class="card results-card" id="adminResultsCard" style="display: none;">
+                <div class="card-header">
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        <span class="card-title">Desglose de Votos</span>
+                        <button id="toggleVotesMaskBtn" onclick="toggleVotesMask()" style="background:none; border:none; cursor:pointer; font-size:1.1rem;" title="Ocultar/Mostrar votos en vivo">🔒</button>
+                    </div>
+                    <span style="font-size: 0.8rem; background: #e2e8f0; padding: 4px 8px; border-radius: 6px; font-weight: 600;" id="quorumBadge">Votos Registrados: 0</span>
+                </div>
+                <div id="adminStatsContainer">
+                    <div class="stat-box">
+                        <div class="stat-header"><span style="color: var(--adep-green);">SÍ</span><span id="labelSi">0 votos (0%)</span></div>
+                        <div class="stat-bar-bg"><div id="barSi" class="stat-bar-fill fill-si" style="width: 0%;"></div></div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="stat-header"><span style="color: var(--adep-red);">NO</span><span id="labelNo">0 votos (0%)</span></div>
+                        <div class="stat-bar-bg"><div id="barNo" class="stat-bar-fill fill-no" style="width: 0%;"></div></div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="stat-header"><span style="color: #64748B;">ABSTENCIÓN</span><span id="labelAbs">0 votos (0%)</span></div>
+                        <div class="stat-bar-bg"><div id="barAbs" class="stat-bar-fill fill-abs" style="width: 0%;"></div></div>
+                    </div>
+                </div>
+                <div class="total-counter" id="totalVotes">Total Votos Emitidos: 0</div>
+                <div style="margin-top: 20px; height: 180px;"><canvas id="resultsChart"></canvas></div>
+            </div>
+
+            <div class="card" id="afiliadoInfoCard" style="display: none;">
+                <div class="card-header">
+                    <span class="card-title">Estado de Participación</span>
+                    <span style="font-size: 0.8rem; background: #E8F5E9; color: var(--adep-dark-green); padding: 4px 8px; border-radius: 6px; font-weight: 600;" id="padronBadgeLabel">Padrón Activo</span>
+                </div>
+                <div class="afiliado-info-box">
+                    <div class="afiliado-info-item"><span class="info-label">Asambleísta Afiliado:</span><span class="info-val" id="infoAfiliadoName">-</span></div>
+                    <div class="afiliado-info-item"><span class="info-label">Cédula:</span><span class="info-val" id="infoAfiliadoCedula">-</span></div>
+                    <div class="afiliado-info-item"><span class="info-label">Filial:</span><span class="info-val" id="infoAfiliadoProvincia">-</span></div>
+                    <div class="afiliado-info-item"><span class="info-label">Estado de Moción Actual:</span><span class="info-val" id="infoMocionStatus" style="color: var(--adep-red);">Pendiente</span></div>
+                </div>
+                <div class="legal-notice">
+                    <strong>Garantía de Voto Secreto y Único:</strong><br>
+                    Su sufragio es emitido de manera segura mediante Firebase. Una vez votado, no se permite cambiar de opción de forma autónoma.
+                </div>
+            </div>
+        </div>
+
+        <div class="card" id="noMotionsContainer" style="display: none; text-align: center; padding: 40px 20px;">
+            <h3 style="color: var(--adep-red); font-size: 1.4rem; margin-bottom: 15px;">⏳ No hay mociones disponibles en este momento</h3>
+            <p style="color: #334155; font-size: 1rem; max-width: 600px; margin: 0 auto; line-height: 1.6; font-weight: 500;">
+                Por favor, espere a que la Administración delibere y publique una nueva propuesta o moción para el plenario. La pantalla se actualizará automáticamente.
+            </p>
+        </div>
+
+        <div class="admin-section" id="adminPanel" style="display: none;">
+            <div class="admin-header">
+                <h3 style="color: var(--adep-dark-green);">Administración - Controles de Fiscalización</h3>
+                <div class="btn-group-admin">
+                    <button class="btn-report" onclick="promptPdfReport()">📄 Descargar Acta Moción (PDF)</button>
+                    <button class="btn-reset" id="btnResetVotes" onclick="resetCurrentVotes()" disabled>🔄 Reiniciar Votos (0)</button>
+                    <button class="btn-reset" style="background-color: #3182CE;" onclick="prepareEditQuestion()">✏️ Editar Moción</button>
+                    <button class="btn-delete" onclick="deleteCurrentQuestion()">🗑️ Borrar Moción Actual</button>
+                </div>
+            </div>
+
+            <!-- Controles de Activación y Temporizador Global -->
+            <div class="motion-creator-box" style="margin-bottom: 20px; border-left: 4px solid var(--adep-green); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px;">
+                <div>
+                    <h4 style="margin-bottom: 5px;">⏱️ Control de Activación y Tiempo de la Moción Actual</h4>
+                    <p style="font-size: 0.85rem; color: #4A5568;" id="adminTimerStatusText">Estado: Moción bloqueada / Inactiva</p>
+                </div>
+                <div style="display: flex; gap: 10px; flex-wrap: wrap;" id="adminTimerButtonsContainer">
+                    <button class="btn-report" style="background-color: var(--adep-green);" onclick="adminActivateMotion()">▶️ Activar Moción y Iniciar 1:30</button>
+                </div>
+            </div>
+
+            <!-- APARTADO: Cuentas Registradas con Buscador, Editar y Eliminar Cuenta -->
+            <div class="motion-creator-box" style="margin-bottom: 20px; border-left: 4px solid var(--adep-dark-green);">
+                <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; margin-bottom: 12px;">
+                    <h4>📋 Cuentas y Conexiones Registradas en el Sistema</h4>
+                    <input type="text" id="searchAccountInput" class="form-control" placeholder="🔍 Buscar cuenta por nombre o cédula..." oninput="renderCuentasRegistradas()" style="max-width: 300px; padding: 8px 12px; font-size: 0.9rem;">
+                </div>
+                <p style="font-size: 0.85rem; color: #4A5568; margin-bottom: 12px;">Monitoreo oficial de todos los usuarios registrados, estado de conexión en plenario, edición y eliminación de cuentas.</p>
+                <div class="audit-table-container">
+                    <table class="audit-table">
+                        <thead>
+                            <tr>
+                                <th>Nombre Completo</th>
+                                <th>Cédula</th>
+                                <th>Filial</th>
+                                <th>Rol</th>
+                                <th>Conexión en Plenario</th>
+                                <th>Acciones de Cuenta</th>
+                            </tr>
+                        </thead>
+                        <tbody id="cuentasRegistradasTableBody">
+                            <tr><td colspan="6" style="text-align:center; color:#718096; padding: 15px;">Cargando cuentas...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- APARTADO OCULTO: Papelera de Cuentas Eliminadas -->
+            <div class="motion-creator-box" style="margin-bottom: 20px; border-left: 4px solid var(--adep-red);">
+                <div style="display: flex; justify-content: space-between; align-items: center; cursor: pointer;" onclick="toggleDeletedSection()">
+                    <h4 style="margin-bottom: 0;">🗑️ Papelera de Cuentas Eliminadas (Restablecer / Borrado Definitivo)</h4>
+                    <button class="btn-report" style="padding: 4px 10px; font-size: 0.8rem; background-color: #4A5568;" id="toggleDeletedBtn">🔽 Mostrar</button>
+                </div>
+                <div id="deletedSectionContainer" style="display: none; margin-top: 15px;">
+                    <p style="font-size: 0.85rem; color: #4A5568; margin-bottom: 12px;">Cuentas eliminadas del sistema. Puede restablecerlas o eliminarlas definitivamente (lo que requerirá que el afiliado envíe una nueva solicitud si desea ingresar).</p>
+                    <div class="audit-table-container">
+                        <table class="audit-table">
+                            <thead>
+                                <tr>
+                                    <th>Nombre Completo</th>
+                                    <th>Cédula</th>
+                                    <th>Filial</th>
+                                    <th>Fecha Eliminación</th>
+                                    <th>Acciones Papelera</th>
+                                </tr>
+                            </thead>
+                            <tbody id="cuentasEliminadasTableBody">
+                                <tr><td colspan="5" style="text-align:center; color:#718096; padding: 15px;">No hay cuentas en la papelera.</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <div class="motion-creator-box" style="margin-bottom: 20px; border-left: 4px solid var(--adep-gold);">
+                <h4>👥 Solicitudes Pendientes (Nuevas Cuentas y Actualización de Datos)</h4>
+                <div class="audit-table-container">
+                    <table class="audit-table">
+                        <thead>
+                            <tr>
+                                <th>Tipo de Solicitud</th>
+                                <th>Nombre / Datos Solicitados</th>
+                                <th>Cédula</th>
+                                <th>Filial</th>
+                                <th>Acción</th>
+                            </tr>
+                        </thead>
+                        <tbody id="solicitudesTableBody">
+                            <tr><td colspan="5" style="text-align:center; color:#718096; padding: 15px;">No hay solicitudes pendientes.</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="motion-creator-box" style="margin-bottom: 20px;">
+                <h4>🔍 Auditoría y Control de Tiempos & Solicitudes de Ayuda</h4>
+                <div class="audit-table-container">
+                    <table class="audit-table">
+                        <thead>
+                            <tr>
+                                <th>Asambleísta / Afiliado</th>
+                                <th>Cédula</th>
+                                <th>Filial</th>
+                                <th>Estado / Voto</th>
+                                <th>Acción</th>
+                            </tr>
+                        </thead>
+                        <tbody id="auditTableBody"></tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="motion-creator-box">
+                <h4 id="motionFormTitle">⚙️ Creación de Nueva Moción (Opciones y Textos Extensos)</h4>
+                <div class="form-group">
+                    <label>Categoría / Título Corto de la Moción</label>
+                    <input type="text" id="newCategoryInput" class="form-control" placeholder="Ej: Moción No. 04 - Elección de Directiva">
+                </div>
+                <div class="form-group">
+                    <label>Pregunta o Texto Completo de la Moción</label>
+                    <textarea id="newTitleInput" class="form-control" placeholder="Redacte aquí todo el contenido detallado..."></textarea>
+                </div>
+                <div class="form-group">
+                    <label>🎛️ Opciones de Respuesta (Opcional)</label>
+                    <select id="optionModeSelect" class="form-control" onchange="handleOptionModeChange()">
+                        <option value="default">Predeterminado (SÍ, NO, ABSTENCIÓN)</option>
+                        <option value="custom">Personalizado (Nombres, candidatos u otras opciones)</option>
+                    </select>
+                </div>
+                <div class="form-group" id="customOptionsGroup" style="display: none;">
+                    <label>✍️ Ingrese las opciones (separadas por comas o una por línea / hacia abajo):</label>
+                    <textarea id="customOptionsInput" class="form-control" placeholder="Ej:&#10;1- Juan Pérez&#10;2- María Rojas&#10;3- Carlos Gómez&#10;O separadas por comas: Opción A, Opción B, Opción C"></textarea>
+                </div>
+                <div class="form-group">
+                    <label>👤 Generado por (Autoría de la Moción)</label>
+                    <select id="authorSelect" class="form-control" onchange="handleAuthorSelectionChange()">
+                        <option value="Mesa Directiva">Panel de Control (Mesa Directiva)</option>
+                        <option value="custom">Otro (Escribir nombre exacto)</option>
+                    </select>
+                </div>
+                <div class="form-group" id="customAuthorGroup" style="display: none;">
+                    <label>✍️ Ingrese el nombre de la persona responsable:</label>
+                    <input type="text" id="customAuthorInput" class="form-control" placeholder="Ej: Lic. Carlos Pérez Rojas">
+                </div>
+                <div style="display: flex; gap: 10px; flex-wrap: wrap;" id="motionActionButtons">
+                    <button type="button" class="btn-report" onclick="addNewQuestion()">➕ Publicar Nueva Moción</button>
+                </div>
+            </div>
+        </div>
+    </main>
+    <footer>Asociación de Educadores Pensionados (ADEP) © 2026 - Sistema Electoral Cloud</footer>
+    <script>
+        const firebaseConfig = {
+            apiKey: "AIzaSyDag4VI6ckp2N_U8xqcKvVFweIHzgWp-CE",
+            authDomain: "sistemavotacionadep.firebaseapp.com",
+            databaseURL: "https://sistemavotacionadep-default-rtdb.firebaseio.com",
+            projectId: "sistemavotacionadep",
+            storageBucket: "sistemavotacionadep.firebasestorage.app",
+            messagingSenderId: "362020645301",
+            appId: "1:362020645301:web:487e6bb5b52f35416a51fc"
+        };
+
+        firebase.initializeApp(firebaseConfig);
+        const dbRef = firebase.database();
+
+        let currentUser = null;
+        let pendingCedulaForRegister = "";
+        let isRequestingNewAccount = false;
+        let memoryCache = { users: {}, deletedUsers: {}, questions: [], votes: {}, solicitantes: {}, solicitudesPerfil: {}, ayudas: {}, timers: {}, activeSessions: {} };
+        let localCountdownInterval = null;
+        let isVotesMasked = false;
+        let editingQuestionId = null;
+        let currentQIndex = 0;
+        let chartInstance = null;
+
+        const padronAfiliadosAutorizados = [
+            { cedula: "104830668", name: "QUIROS BURGOS VERNY", filial: "SAN JOSE" },
+            { cedula: "104470732", name: "GUILLÉN RAMOS JUAN CARLOS", filial: "SANTA ΑΝΑ" },
+            { cedula: "103670890", name: "GONZALEZ ZAMORA MA. DE LOS ANG.", filial: "MORAVIA" },
+            { cedula: "104040052", name: "FONSECA UREÑA ALBERTO", filial: "PEREZ ZELEDON" },
+            { cedula: "106780437", name: "GOMEZ ESPINOZA JUAN ANTONIO", filial: "PURISCAL" },
+            { cedula: "202700368", name: "CASTRO HERRERA GILDA", filial: "TIBAS" },
+            { cedula: "103360380", name: "IRIAS MORA LEDA MARIA", filial: "HATILLO" },
+            { cedula: "102960293", name: "FALLAS QUESADA HUGO", filial: "MORA" },
+            { cedula: "103710457", name: "MADRIGAL HIDALGO FRANCISCA", filial: "ESCAZÚ" },
+            { cedula: "104930753", name: "MONTERO MENDEZ MARIA DE LOS ANGELES", filial: "GOIGOECHEA" },
+            { cedula: "107760811", name: "CARAVACA VALVERDE GRETTEL MARGARITA", filial: "DESAMPARADOS" },
+            { cedula: "103420983", name: "VARGAS MORA TERESITA", filial: "CORONADO" },
+            { cedula: "700380197", name: "SHEDDEN HARRIS ANA ANGELA", filial: "CURRIDABAT" },
+            { cedula: "501000586", name: "VILLALOBOS DUARTE ELIZABETH", filial: "PAVAS" },
+            { cedula: "900390997", name: "SALAZAR CASTRO ELIDIETH", filial: "SAN FCO. DOS RIOS" },
+            { cedula: "103610121", name: "JIMENEZ CASTRO LIDIETH", filial: "ASERRI" },
+            { cedula: "900400326", name: "RAMIREZ SOTO DENNIS ARLIN", filial: "ALAJUELA" },
+            { cedula: "204100274", name: "ESPINOZA SALAS ANA VICTORIA", filial: "ATENAS" },
+            { cedula: "203940244", name: "FERNANDEZ FERNANDEZ MAYELA", filial: "SAN RAMON" },
+            { cedula: "203590664", name: "ARIAS VARGAS SIRA LORENA", filial: "GRECIA" },
+            { cedula: "203780285", name: "JIMENEZ RETANA JAIME", filial: "SAN CARLOS" },
+            { cedula: "202670052", name: "GOLCHER FLORES PEDRO", filial: "PALMARES" },
+            { cedula: "601110760", name: "ALPIZAR RODRIGUEZ OLDEMAR", filial: "OROTINA SAN MATEO" },
+            { cedula: "202790114", name: "FONSECA MURILLO MARIA CLEMENCIA", filial: "NARANJO" },
+            { cedula: "900570299", name: "RUIZ GARCIA MAXIMO", filial: "UPALA" },
+            { cedula: "302230115", name: "RODRIGUEZ QUIROS ROSA ELENA", filial: "CARTAGO" },
+            { cedula: "102700773", name: "GUEVARA SOTO CLAUDIA", filial: "LA UNIÓN" },
+            { cedula: "104151213", name: "HERNANDEZ SOTO GRACE MARIA", filial: "TURRIALBA" },
+            { cedula: "302890340", name: "GONZALEZ GARITA DAMARIS", filial: "PARAISO" },
+            { cedula: "103440494", name: "ZAVALETA FORTADO HERNAN FRANCISCO", filial: "TEJAR DEL GUARCO" },
+            { cedula: "104370678", name: "MORA LOBO ANA VICTORIA", filial: "HEREDIA" },
+            { cedula: "401051157", name: "PANIAGUA SOTO GLORIA MARIA", filial: "BARVA" },
+            { cedula: "401070684", name: "ALFARO SANCHEZ VIRIA ROSA", filial: "FLORES" },
+            { cedula: "302210888", name: "DELGADO BOGARIN ILEANA", filial: "SAN RAFAEL HEREDIA" },
+            { cedula: "107860043", name: "ALVARADO VARGAS PAULINA MARIA", filial: "STO.DOMINGO HEREDIA" },
+            { cedula: "202771216", name: "MONTERO CORTES RIGOBERTO", filial: "SAN PABLO DE HEREDIA" },
+            { cedula: "104181489", name: "VILLALOBOS FALLAS YURY", filial: "SANTA BARBARA DE HEREDIA" },
+            { cedula: "501870703", name: "VILLEGAS ESTRADA ROCIO DEL MILAGRO", filial: "NICOYA" },
+            { cedula: "401060370", name: "SANCHEZ CAMPOS MARIA ELENA", filial: "SANTA CRUZ" },
+            { cedula: "501300259", name: "ALVAREZ MIRANDA ANA VILMA", filial: "LIBERIA" },
+            { cedula: "203330648", name: "ROJAS CHINCHILLA SOCORRO", filial: "TILARAN" },
+            { cedula: "501470561", name: "JAEN JAEN RAFAEL ÁNGEL", filial: "CARRILLO" },
+            { cedula: "501730054", name: "CARMONA ALVAREZ FRANCISCA", filial: "CAÑAS" },
+            { cedula: "600700407", name: "LOPEZ RODRIGUEZ EFREN", filial: "PUNTARENAS" },
+            { cedula: "601880179", name: "MADRIGAL ARGUEDAS LILIANA ROCIO", filial: "ESPARZA" },
+            { cedula: "601720822", name: "GRILLO CASTILLO CARLOS EDUARDO", filial: "SUR SUR" },
+            { cedula: "600750783", name: "CHAVES ALVARADO HANNIA", filial: "EL ROBLE" },
+            { cedula: "600951051", name: "HERNANDEZ BLANDINO DENNIS", filial: "QUEPOS" },
+            { cedula: "107480304", name: "VARGAS VILLANUEVA LUIS ANGEL", filial: "BUENOS AIRES" },
+            { cedula: "601120504", name: "GARRO ROJAS VICTOR HUGO", filial: "MONTES DE ORO-MIRAMAR" },
+            { cedula: "700471446", name: "CASTILLO SERRANO DEYANIRA", filial: "LIMON" },
+            { cedula: "700730069", name: "ZELAYA MORA SONIA", filial: "POCOCI" },
+            { cedula: "106840195", name: "SOLANO LOPEZ LAURA", filial: "LOS SANTOS" },
+            { cedula: "601250940", name: "ALFARO ACOSTA ANGELITA", filial: "NANDAYURE" },
+            { cedula: "202900842", name: "HERNANDEZ MURILLO ADINA", filial: "POAS" },
+            { cedula: "202450149", name: "RODRIGUEZ MORALES FLORA VIRGINIA", filial: "ALFARO RUIZ-ZARCERO" },
+            { cedula: "900850787", name: "ARIAS ARIAS FLOR MARIA", filial: "VALVERDE VEGA-SARCHI" },
+            { cedula: "301780190", name: "GUEVARA LEIVA MELIDA", filial: "LA SUIZA" },
+            { cedula: "501750657", name: "HERNANDEZ MURILLO GILDA", filial: "SARDINAL - CARRILLO" },
+            { cedula: "500850377", name: "ALVARADO CORDERO EDGAR", filial: "SAN ANTONIO DE BELEN" },
+            { cedula: "401270885", name: "VILLALOBOS CHACON MARTIN", filial: "SAN ISIDRO HEREDIA" },
+            { cedula: "501380399", name: "FUENTES DE LA O MIGUEL ANGEL", filial: "LA CRUZ" },
+            { cedula: "202250677", name: "CERDAS PEREZ JOSE EDUARDO", filial: "OSA(PALMAR NORTE-SUR" },
+            { cedula: "502380599", name: "MATARRITA MORALES LIDIETH", filial: "JUNTAS DE ABANGARES" },
+            { cedula: "601690222", name: "QUESADA LOPEZ FERNANDO", filial: "COBANO PAQUERA" },
+            { cedula: "501560378", name: "MONTERO CHACON ALCIRA", filial: "JICARAL" },
+            { cedula: "104880403", name: "VARGAS VARGAS VERA VIOLETA", filial: "MONTES DE OCA" },
+            { cedula: "203300569", name: "MOLINA ZELEDON JOSE RAFAEL", filial: "SARAPIQUÍ" },
+            { cedula: "501690852", name: "BOGANTES MORALES XINIA MARIA", filial: "BATAN" },
+            { cedula: "106660468", name: "MARTINEZ PICADO OLIVIER DE JESUS", filial: "SAN VITO" },
+            { cedula: "202390652", name: "RUIZ ALEMAN LUCRECIA", filial: "LA URUCA" },
+            { cedula: "301240085", name: "COTO QUIROS VIRGINIA", filial: "ZAPOTE" },
+            { cedula: "120290125", name: "RASHID BADO JIMÉNEZ", filial: "SAN JOSE" }
+        ];
+
+        function normalizeUsersToMap(rawData) {
+            let map = {};
+            if (!rawData) return map;
+            if (Array.isArray(rawData)) {
+                rawData.forEach(u => {
+                    if (u && u.cedula) map[String(u.cedula).trim()] = u;
+                });
+            } else if (typeof rawData === 'object') {
+                Object.keys(rawData).forEach(key => {
+                    const u = rawData[key];
+                    if (u && u.cedula) {
+                        map[String(u.cedula).trim()] = u;
+                    }
+                });
+            }
+            return map;
+        }
+
+        function showAppNotification(message, type = "success") {
+            const notif = document.getElementById("appNotification");
+            notif.className = `app-notification ${type}`;
+            notif.innerText = message;
+            notif.style.display = "block";
+            setTimeout(() => { notif.style.display = "none"; }, 5000);
+        }
+
+        let modalCallback = null;
+        function showCustomModal(title, text, callback, confirmText = "OK, Entendido", showCancel = true) {
+            document.getElementById("modalTitle").innerText = title;
+            document.getElementById("modalText").innerText = text;
+            document.getElementById("modalConfirmBtn").innerText = confirmText;
+            document.getElementById("modalCancelBtn").style.display = showCancel ? "inline-block" : "none";
+            document.getElementById("customModal").style.display = "flex";
+            modalCallback = callback;
+        }
+
+        function closeModal(confirmed) {
+            document.getElementById("customModal").style.display = "none";
+            if (modalCallback) {
+                modalCallback(confirmed);
+                modalCallback = null;
+            }
+        }
+
+        function toggleDeletedSection() {
+            const container = document.getElementById("deletedSectionContainer");
+            const btn = document.getElementById("toggleDeletedBtn");
+            if (container.style.display === "none") {
+                container.style.display = "block";
+                btn.innerText = "🔼 Ocultar";
+            } else {
+                container.style.display = "none";
+                btn.innerText = "🔽 Mostrar";
+            }
+        }
+
+        function promptPdfReport() {
+            const questions = memoryCache.questions;
+            if (!questions || questions.length === 0) return;
+            document.getElementById("pdfTypeModal").style.display = "flex";
+        }
+
+        function closePdfModal(confirmed) {
+            document.getElementById("pdfTypeModal").style.display = "none";
+            if (!confirmed) return;
+            const visibility = document.querySelector('input[name="pdfVisibility"]:checked').value;
+            generatePdfReport(visibility);
+        }
+
+        function toggleVotesMask() {
+            isVotesMasked = !isVotesMasked;
+            document.getElementById("toggleVotesMaskBtn").innerText = isVotesMasked ? "🔓" : "🔒";
+            renderAll();
+        }
+
+        function openEditProfileModal() {
+            if (!currentUser) return;
+            document.getElementById("editProfileName").value = currentUser.name || "";
+            document.getElementById("editProfileProvincia").value = currentUser.filial || "";
+            document.getElementById("editProfileModal").style.display = "flex";
+        }
+
+        function closeEditProfileModal() {
+            document.getElementById("editProfileModal").style.display = "none";
+        }
+
+        function submitEditProfileRequest(e) {
+            e.preventDefault();
+            const newName = document.getElementById("editProfileName").value.trim().toUpperCase();
+            const newFilial = document.getElementById("editProfileProvincia").value.trim().toUpperCase();
+            if (!newName || !newFilial) return;
+
+            const profileData = {
+                cedula: currentUser.cedula,
+                currentName: currentUser.name,
+                newName: newName,
+                newFilial: newFilial,
+                timestamp: Date.now()
+            };
+
+            dbRef.ref(`solicitudesPerfil/${currentUser.cedula}`).set(profileData).then(() => {
+                closeEditProfileModal();
+                showAppNotification("Solicitud de actualización de datos enviada a la Administración.", "success");
+            });
+        }
+
+        let accountOriginalState = { name: "", filial: "" };
+
+        function openAdminEditAccount(cedula) {
+            const usersMap = memoryCache.users || {};
+            const user = usersMap[cedula];
+            if (!user) return;
+
+            document.getElementById("editAccountCedulaOriginal").value = cedula;
+            document.getElementById("editAccountCedula").value = cedula;
+            document.getElementById("editAccountName").value = user.name || "";
+            document.getElementById("editAccountProvincia").value = user.filial || "";
+
+            accountOriginalState = { name: (user.name || "").trim().toUpperCase(), filial: (user.filial || "").trim().toUpperCase() };
+            document.getElementById("btnSaveAccountChanges").disabled = true;
+            document.getElementById("adminEditAccountModal").style.display = "flex";
+        }
+
+        function closeAdminEditAccountModal() {
+            document.getElementById("adminEditAccountModal").style.display = "none";
+        }
+
+        function checkAccountChanges() {
+            const currentName = document.getElementById("editAccountName").value.trim().toUpperCase();
+            const currentFilial = document.getElementById("editAccountProvincia").value.trim().toUpperCase();
+            const hasChanged = (currentName !== accountOriginalState.name || currentFilial !== accountOriginalState.filial) && currentName !== "" && currentFilial !== "";
+            document.getElementById("btnSaveAccountChanges").disabled = !hasChanged;
+        }
+
+        function submitAdminEditAccount(e) {
+            e.preventDefault();
+            const cedula = document.getElementById("editAccountCedulaOriginal").value;
+            const newName = document.getElementById("editAccountName").value.trim().toUpperCase();
+            const newFilial = document.getElementById("editAccountProvincia").value.trim().toUpperCase();
+
+            if (!newName || !newFilial) return;
+
+            dbRef.ref('users').once('value').then(snap => {
+                let cleanMap = normalizeUsersToMap(snap.val());
+                if (cleanMap[cedula]) {
+                    cleanMap[cedula].name = newName;
+                    cleanMap[cedula].filial = newFilial;
+                    dbRef.ref('users').set(cleanMap).then(() => {
+                        memoryCache.users = cleanMap;
+                        closeAdminEditAccountModal();
+                        renderCuentasRegistradas();
+                        showAppNotification("Cuenta de afiliado actualizada con éxito.", "success");
+                    });
+                }
+            });
+        }
+
+        function adminDeleteAccount(cedula, name) {
+            showCustomModal("Eliminar Cuenta", `¿Está seguro de eliminar la cuenta de ${name} (Cédula: ${cedula})? La cuenta pasará a la papelera y se bloqueará su acceso de inmediato.`, (confirmed) => {
+                if (!confirmed) return;
+
+                dbRef.ref('users').once('value').then(snap => {
+                    let cleanMap = normalizeUsersToMap(snap.val());
+                    const userObj = cleanMap[cedula];
+                    if (!userObj) return;
+
+                    const deletedData = { ...userObj, deletedAt: Date.now() };
+                    delete cleanMap[cedula];
+
+                    const updates = {};
+                    updates[`deletedUsers/${cedula}`] = deletedData;
+                    updates[`users`] = cleanMap;
+
+                    dbRef.ref().update(updates).then(() => {
+                        dbRef.ref('activeSessions').once('value').then(sessSnap => {
+                            let sessions = sessSnap.val() || {};
+                            Object.keys(sessions).forEach(qId => {
+                                if (sessions[qId] && sessions[qId][cedula]) {
+                                    dbRef.ref(`activeSessions/${qId}/${cedula}`).remove();
+                                }
+                            });
+                        });
+
+                        memoryCache.users = cleanMap;
+                        if (!memoryCache.deletedUsers) memoryCache.deletedUsers = {};
+                        memoryCache.deletedUsers[cedula] = deletedData;
+
+                        renderCuentasRegistradas();
+                        renderCuentasEliminadas();
+                        showAppNotification(`Cuenta de ${name} eliminada correctamente.`, "success");
+                    });
+                });
+            }, "Eliminar", true);
+        }
+
+        function adminRestoreAccount(cedula, name) {
+            showCustomModal("Restablecer Cuenta", `¿Desea restablecer la cuenta de ${name} desde la papelera? El afiliado podrá volver a ingresar sin enviar nueva solicitud.`, (confirmed) => {
+                if (!confirmed) return;
+                const deletedMap = memoryCache.deletedUsers || {};
+                const userObj = deletedMap[cedula];
+                if (!userObj) return;
+
+                let restoredUser = { ...userObj };
+                delete restoredUser.deletedAt;
+
+                dbRef.ref('users').once('value').then(snap => {
+                    let cleanMap = normalizeUsersToMap(snap.val());
+                    cleanMap[cedula] = restoredUser;
+
+                    const updates = {};
+                    updates[`users`] = cleanMap;
+                    updates[`deletedUsers/${cedula}`] = null;
+
+                    dbRef.ref().update(updates).then(() => {
+                        if (memoryCache.deletedUsers && memoryCache.deletedUsers[cedula]) {
+                            delete memoryCache.deletedUsers[cedula];
+                        }
+                        memoryCache.users = cleanMap;
+
+                        renderCuentasRegistradas();
+                        renderCuentasEliminadas();
+                        showAppNotification(`Cuenta de ${name} restablecida con éxito.`, "success");
+                    });
+                });
+            }, "Restablecer", true);
+        }
+
+        function adminPermanentDeleteAccount(cedula, name) {
+            showCustomModal("🗑️ Eliminar Cuenta Definitivamente", `⚠️ ADVERTENCIA: ¿Está seguro de eliminar definitivamente la cuenta de ${name} (Cédula: ${cedula})? Esta acción borrará todos sus registros del sistema. Si desea ingresar nuevamente en el futuro, la cédula requerirá enviar una nueva solicitud de registro.`, (confirmed) => {
+                if (!confirmed) return;
+                dbRef.ref(`deletedUsers/${cedula}`).remove().then(() => {
+                    if (memoryCache.deletedUsers && memoryCache.deletedUsers[cedula]) {
+                        delete memoryCache.deletedUsers[cedula];
+                    }
+                    renderCuentasEliminadas();
+                    showAppNotification(`Cuenta de ${name} eliminada definitivamente del sistema.`, "success");
+                });
+            }, "Sí, Eliminar Definitivamente", true);
+        }
+
+        function handleAuthorSelectionChange() {
+            const selectVal = document.getElementById("authorSelect").value;
+            const customGroup = document.getElementById("customAuthorGroup");
+            if (selectVal === "custom") {
+                customGroup.style.display = "block";
+                document.getElementById("customAuthorInput").focus();
+            } else {
+                customGroup.style.display = "none";
+                document.getElementById("customAuthorInput").value = "";
+            }
+        }
+
+        function handleOptionModeChange() {
+            const mode = document.getElementById("optionModeSelect").value;
+            const group = document.getElementById("customOptionsGroup");
+            if (mode === "custom") {
+                group.style.display = "block";
+            } else {
+                group.style.display = "none";
+                document.getElementById("customOptionsInput").value = "";
+            }
+        }
+
+        function switchAuthTab(tab) {
+            hideAlert();
+            document.getElementById('tabAfiliado').classList.remove('active');
+            document.getElementById('tabLoginAdmin').classList.remove('active');
+
+            document.getElementById('afiliadoSimplificadoForm').style.display = 'none';
+            document.getElementById('loginAdminForm').style.display = 'none';
+
+            if (tab === 'afiliado') {
+                document.getElementById('tabAfiliado').classList.add('active');
+                document.getElementById('afiliadoSimplificadoForm').style.display = 'block';
+            } else if (tab === 'loginAdmin') {
+                document.getElementById('tabLoginAdmin').classList.add('active');
+                document.getElementById('loginAdminForm').style.display = 'block';
+            }
+        }
+
+        function showAlert(msg, type = "danger") {
+            const alertBox = document.getElementById('authAlert');
+            alertBox.className = `alert-box alert-${type}`;
+            alertBox.innerText = msg;
+            alertBox.style.display = 'block';
+        }
+
+        function hideAlert() { document.getElementById('authAlert').style.display = 'none'; }
+
+        function closePrimerRegistroModal() {
+            document.getElementById('primerRegistroModal').style.display = 'none';
+            pendingCedulaForRegister = "";
+            isRequestingNewAccount = false;
+        }
+
+        function handleAfiliadoSimplificado(e) {
+            e.preventDefault();
+            hideAlert();
+            const cedulaInput = document.getElementById('afiliadoCedulaInput').value.trim();
+
+            if (!cedulaInput) { 
+                showAlert("Por favor, ingrese su número de cédula."); 
+                return; 
+            }
+
+            const regexCedula = /^\d{9}$/;
+            if (!regexCedula.test(cedulaInput)) {
+                showAlert("Error: La cédula costarricense debe contener exactamente 9 dígitos numéricos.");
+                return;
+            }
+
+            dbRef.ref(`deletedUsers/${cedulaInput}`).once('value').then(delSnap => {
+                if (delSnap.exists()) {
+                    showAlert("⚠️ Su cuenta ha sido eliminada por la Administración. Debe esperar a que sea restablecida para poder ingresar.");
+                    return;
+                }
+
+                dbRef.ref('users').once('value').then((snapshot) => {
+                    let usersMap = normalizeUsersToMap(snapshot.val());
+
+                    if (Object.keys(usersMap).length === 0) {
+                        padronAfiliadosAutorizados.forEach(u => {
+                            usersMap[u.cedula] = { ...u, name: u.name.toUpperCase(), filial: u.filial.toUpperCase(), pin: "1234", role: "Afiliado" };
+                        });
+                        usersMap["admin"] = { name: "MESA DIRECTIVA", cedula: "admin", pin: "123", role: "Mesa Directiva", filial: "SAN JOSÉ" };
+                        dbRef.ref('users').set(usersMap);
+                    }
+
+                    const userRegistrado = usersMap[cedulaInput];
+
+                    if (userRegistrado) {
+                        isRequestingNewAccount = false;
+                        pendingCedulaForRegister = cedulaInput;
+                        document.getElementById('regRapidoName').value = userRegistrado.name.toUpperCase();
+                        document.getElementById('regRapidoProvincia').value = userRegistrado.filial.toUpperCase();
+                        document.getElementById('modalRegTitle').innerText = "👤 Verificación de Datos de Afiliado";
+                        document.getElementById('modalRegDesc').innerText = "Sus datos están registrados en el sistema. Por favor verifique su nombre y filial para confirmar su acceso:";
+                        document.getElementById('btnSubmitRegistro').innerText = "Confirmar e Ingresar";
+                        document.getElementById('regRapidoAlert').style.display = 'none';
+                        document.getElementById('primerRegistroModal').style.display = 'flex';
+                        return;
+                    }
+
+                    dbRef.ref(`solicitudes/${cedulaInput}`).once('value').then(solSnap => {
+                        if (solSnap.exists()) {
+                            showAlert("Su solicitud de registro ya fue enviada a la Administración y se encuentra pendiente de aprobación.");
+                        } else {
+                            isRequestingNewAccount = true;
+                            pendingCedulaForRegister = cedulaInput;
+                            document.getElementById('modalRegTitle').innerText = "➕ Solicitud de Registro de Afiliado";
+                            document.getElementById('modalRegDesc').innerText = "Su cédula no se encuentra registrada en el sistema activo. Complete sus datos para enviar una solicitud de aprobación a la Administración:";
+                            document.getElementById('regRapidoName').value = "";
+                            document.getElementById('regRapidoProvincia').value = "";
+                            document.getElementById('btnSubmitRegistro').innerText = "Enviar Solicitud a Administración";
+                            document.getElementById('primerRegistroModal').style.display = 'flex';
+                        }
+                    });
+                });
+            }).catch(err => {
+                console.error("Error al conectar con Firebase:", err);
+                showAlert("Error de conexión con la base de datos. Verifique su red.");
+            });
+        }
+
+        function submitPrimerRegistro(e) {
+            e.preventDefault();
+            const name = document.getElementById('regRapidoName').value.trim().toUpperCase();
+            const filial = document.getElementById('regRapidoProvincia').value.trim().toUpperCase();
+
+            if (!name || !filial) return;
+
+            if (isRequestingNewAccount) {
+                const solicitudData = {
+                    name: name,
+                    cedula: pendingCedulaForRegister,
+                    filial: filial,
+                    timestamp: Date.now()
+                };
+                dbRef.ref(`solicitudes/${pendingCedulaForRegister}`).set(solicitudData).then(() => {
+                    closePrimerRegistroModal();
+                    showAlert("✅ Solicitud enviada a la Administración. Por favor espere su aprobación para ingresar.", "success");
+                });
+            } else {
+                const newUser = { name: name, cedula: pendingCedulaForRegister, filial: filial, pin: "1234", role: "Afiliado" };
+                dbRef.ref(`users/${pendingCedulaForRegister}`).set(newUser).then(() => {
+                    currentUser = newUser;
+                    sessionStorage.setItem("adep_session_user", JSON.stringify(newUser));
+                    closePrimerRegistroModal();
+                    showAppNotification(`¡Ingreso exitoso! Bienvenido/a, ${name}`, "success");
+                    proceedToMainApp();
+                });
+            }
+        }
+
+        function handleLoginAdmin(e) {
+            e.preventDefault();
+            hideAlert();
+            const pinInput = document.getElementById('loginAdminPin').value.trim();
+            if (pinInput === "123") {
+                /* Dentro de la app dice Panel de Control (Mesa Directiva) */
+                currentUser = { name: "Panel de Control", cedula: "admin", role: "Mesa Directiva", filial: "SAN JOSÉ" };
+                sessionStorage.setItem("adep_session_user", JSON.stringify(currentUser));
+                showAppNotification("¡Bienvenido, Administrador!", "success");
+                proceedToMainApp();
+            } else {
+                showAlert("PIN de Administrador incorrecto.");
+            }
+        }
+
+        function proceedToMainApp() {
+            document.getElementById('loadingScreen').style.display = 'flex';
+            setTimeout(() => {
+                document.getElementById('loadingScreen').style.display = 'none';
+                checkSession();
+            }, 600);
+        }
+
+        function logout() {
+            if (localCountdownInterval) clearInterval(localCountdownInterval);
+            if (currentUser && currentUser.role === "Mesa Directiva") {
+                const questions = memoryCache.questions;
+                if (questions && questions.length > 0) {
+                    questions.forEach(q => {
+                        dbRef.ref(`activeSessions/${q.id}/${currentUser.cedula}`).remove();
+                    });
+                }
+            }
+            sessionStorage.removeItem("adep_session_user");
+            currentUser = null;
+            checkSession();
+        }
+
+        function checkSession() {
+            const sessionStored = sessionStorage.getItem("adep_session_user");
+            if (sessionStored) {
+                try { currentUser = JSON.parse(sessionStored); } catch(e) { currentUser = null; }
+            } else {
+                currentUser = null;
+            }
+
+            if (currentUser) {
+                if (currentUser.role === "Afiliado") {
+                    const usersMap = memoryCache.users || {};
+                    const deletedMap = memoryCache.deletedUsers || {};
+                    if ((memoryCache.usersLoaded && !usersMap[currentUser.cedula]) || deletedMap[currentUser.cedula]) {
+                        logout();
+                        showCustomModal("Cuenta Eliminada", "⚠️ Su cuenta ha sido eliminada por la Administración. Su sesión ha sido cerrada automáticamente.", () => {}, "Entendido", false);
+                        return;
+                    }
+                }
+
+                document.getElementById('authContainer').style.display = 'none';
+                document.getElementById('loadingScreen').style.display = 'none';
+                document.getElementById('mainApp').style.display = 'block';
+                document.getElementById('userInfoHeader').style.display = 'flex';
+                
+                /* Título formal dentro de la app: Panel de Control (Mesa Directiva) */
+                const displayName = currentUser.role === "Mesa Directiva" ? "Panel de Control" : currentUser.name;
+                const displayRole = currentUser.role === "Mesa Directiva" ? "Mesa Directiva" : currentUser.role;
+                document.getElementById('headerUserName').innerText = `👤 ${displayName} (${displayRole})`;
+
+                if (currentUser.role === "Afiliado") {
+                    const questions = memoryCache.questions;
+                    if (questions && questions.length > 0) {
+                        const currentQ = questions[currentQIndex];
+                        if (currentQ) {
+                            dbRef.ref(`activeSessions/${currentQ.id}/${currentUser.cedula}`).set({
+                                name: currentUser.name,
+                                filial: currentUser.filial || "N/A",
+                                timestamp: Date.now()
+                            });
+                        }
+                    }
+                }
+
+                const isAdmin = (currentUser.role === "Mesa Directiva");
+                document.getElementById('adminResultsCard').style.display = isAdmin ? 'block' : 'none';
+                document.getElementById('adminPanel').style.display = isAdmin ? 'block' : 'none';
+                document.getElementById('afiliadoInfoCard').style.display = isAdmin ? 'none' : 'block';
+                document.getElementById('afiliadoTimerBanner').style.display = isAdmin ? 'none' : 'flex';
+                document.getElementById('helpActionBox').style.display = isAdmin ? 'none' : 'flex';
+
+                startGlobalCountdownDaemon();
+                initTabs();
+                renderAll();
+            } else {
+                document.getElementById('authContainer').style.display = 'flex';
+                document.getElementById('loadingScreen').style.display = 'none';
+                document.getElementById('mainApp').style.display = 'none';
+                document.getElementById('userInfoHeader').style.display = 'none';
+            }
+        }
+
+        function initTabs() {
+            const container = document.getElementById("tabsContainer");
+            if (!container) return;
+            container.innerHTML = "";
+            const questions = memoryCache.questions;
+            
+            if (!questions || questions.length === 0) {
+                container.style.display = "none";
+                return;
+            }
+            container.style.display = "flex";
+
+            const isAdmin = currentUser && currentUser.role === "Mesa Directiva";
+            const timersDB = memoryCache.timers || {};
+
+            questions.forEach((q, idx) => {
+                const btn = document.createElement("button");
+                let isLocked = false;
+                const timerInfo = timersDB[q.id] || { active: false, timeLeft: 90, started: false };
+
+                if (!isAdmin) {
+                    if (!timerInfo.started) {
+                        isLocked = true;
+                    }
+                }
+
+                btn.className = `q-tab ${idx === currentQIndex ? 'active' : ''} ${isLocked ? 'locked' : ''}`;
+                btn.innerText = `Moción ${idx + 1}${isLocked ? ' 🔒' : ''}`;
+                
+                btn.onclick = () => {
+                    if (isLocked) {
+                        showAppNotification("⚠️ Esta moción está bloqueada hasta que la Administración la active.", "error");
+                        return;
+                    }
+                    currentQIndex = idx;
+                    initTabs();
+                    renderAll();
+                };
+                container.appendChild(btn);
+            });
+        }
+
+        dbRef.ref('questions').on('value', (snapshot) => {
+            const dataVal = snapshot.val();
+            if (dataVal === null) {
+                memoryCache.questions = [];
+            } else {
+                memoryCache.questions = Array.isArray(dataVal) ? dataVal : Object.values(dataVal);
+            }
+            initTabs();
+            renderAll();
+        });
+
+        dbRef.ref('votes').on('value', (snapshot) => {
+            memoryCache.votes = snapshot.val() || {};
+            initTabs();
+            renderAll();
+        });
+
+        dbRef.ref('users').on('value', (snapshot) => {
+            memoryCache.users = normalizeUsersToMap(snapshot.val());
+            memoryCache.usersLoaded = true;
+            if (currentUser && currentUser.role === "Afiliado") {
+                const usersMap = memoryCache.users;
+                const deletedMap = memoryCache.deletedUsers || {};
+                if (!usersMap[currentUser.cedula] || deletedMap[currentUser.cedula]) {
+                    logout();
+                    showCustomModal("Cuenta Eliminada", "⚠️ Su cuenta ha sido eliminada por la Administración. Su sesión ha sido cerrada automáticamente.", () => {}, "Entendido", false);
+                    return;
+                }
+                if (usersMap[currentUser.cedula]) {
+                    currentUser = usersMap[currentUser.cedula];
+                    sessionStorage.setItem("adep_session_user", JSON.stringify(currentUser));
+                }
+            }
+            renderAll();
+        });
+
+        dbRef.ref('deletedUsers').on('value', (snapshot) => {
+            memoryCache.deletedUsers = snapshot.val() || {};
+            if (currentUser && currentUser.role === "Afiliado") {
+                if (memoryCache.deletedUsers[currentUser.cedula]) {
+                    logout();
+                    showCustomModal("Cuenta Eliminada", "⚠️ Su cuenta ha sido eliminada por la Administración. Su sesión ha sido cerrada automáticamente.", () => {}, "Entendido", false);
+                    return;
+                }
+            }
+            renderAll();
+        });
+
+        dbRef.ref('solicitudes').on('value', (snapshot) => {
+            memoryCache.solicitantes = snapshot.val() || {};
+            renderAll();
+        });
+
+        dbRef.ref('solicitudesPerfil').on('value', (snapshot) => {
+            memoryCache.solicitudesPerfil = snapshot.val() || {};
+            renderAll();
+        });
+
+        dbRef.ref('ayudas').on('value', (snapshot) => {
+            memoryCache.ayudas = snapshot.val() || {};
+            renderAll();
+        });
+
+        dbRef.ref('timers').on('value', (snapshot) => {
+            memoryCache.timers = snapshot.val() || {};
+            initTabs();
+            renderAll();
+        });
+
+        dbRef.ref('activeSessions').on('value', (snapshot) => {
+            memoryCache.activeSessions = snapshot.val() || {};
+            renderAll();
+        });
+    </script>
+    <script>
+        function startGlobalCountdownDaemon() {
+            if (localCountdownInterval) clearInterval(localCountdownInterval);
+            localCountdownInterval = setInterval(() => {
+                const questions = memoryCache.questions;
+                if (!questions || questions.length === 0) return;
+                const currentQ = questions[currentQIndex];
+                if (!currentQ) return;
+
+                const timersDB = memoryCache.timers || {};
+                const timerInfo = timersDB[currentQ.id] || { active: false, timeLeft: 90, started: false };
+
+                if (timerInfo.active && timerInfo.timeLeft > 0) {
+                    const newTime = timerInfo.timeLeft - 1;
+                    dbRef.ref(`timers/${currentQ.id}`).update({ 
+                        timeLeft: newTime,
+                        active: newTime > 0 ? true : false
+                    });
+                }
+            }, 1000);
+        }
+
+        function adminActivateMotion() {
+            const questions = memoryCache.questions;
+            if (!questions || questions.length === 0) return;
+            const qId = questions[currentQIndex].id;
+            
+            dbRef.ref(`timers/${qId}`).set({ active: true, timeLeft: 90, started: true }).then(() => {
+                showAppNotification("¡Moción activada! El temporizador de 1:30 ha iniciado en tiempo real.", "success");
+            });
+        }
+
+        function adminToggleTimer() {
+            const questions = memoryCache.questions;
+            if (!questions || questions.length === 0) return;
+            const qId = questions[currentQIndex].id;
+            const timersDB = memoryCache.timers || {};
+            const currentTimer = timersDB[qId] || { timeLeft: 90, active: false, started: true };
+
+            const newState = !currentTimer.active;
+            dbRef.ref(`timers/${qId}`).update({ active: newState, started: true }).then(() => {
+                showAppNotification(newState ? "Temporizador reanudado." : "Temporizador detenido.", "success");
+            });
+        }
+
+        function adminResetTimer() {
+            const questions = memoryCache.questions;
+            if (!questions || questions.length === 0) return;
+            const qId = questions[currentQIndex].id;
+
+            dbRef.ref(`timers/${qId}`).update({ active: true, timeLeft: 90, started: true }).then(() => {
+                showAppNotification("Temporizador reiniciado a 01:30.", "success");
+            });
+        }
+
+        function adminFinishMotion() {
+            const questions = memoryCache.questions;
+            if (!questions || questions.length === 0) return;
+            const qId = questions[currentQIndex].id;
+
+            showCustomModal("Finalizar Moción", "¿Desea dar por concluida esta moción y regresar a la opción de Activar Moción?", (confirmed) => {
+                if (!confirmed) return;
+                dbRef.ref(`timers/${qId}`).set({ active: false, timeLeft: 90, started: false }).then(() => {
+                    showAppNotification("Moción finalizada. Se restableció la opción de Activar Moción.", "success");
+                });
+            }, "Finalizar", true);
+        }
+
+        function getResolvedAuthor() {
+            const selectVal = document.getElementById("authorSelect").value;
+            if (selectVal === "custom") {
+                const customName = document.getElementById("customAuthorInput").value.trim().toUpperCase();
+                return customName ? customName : "MESA DIRECTIVA";
+            }
+            return "MESA DIRECTIVA";
+        }
+
+        function parseCustomOptions(text) {
+            if (!text) return ["SÍ", "NO", "ABSTENCIÓN"];
+            let rawOpts = text.split(/,|\n/).map(o => o.trim().toUpperCase()).filter(o => o.length > 0);
+            return rawOpts.length > 0 ? rawOpts : ["SÍ", "NO", "ABSTENCIÓN"];
+        }
+
+        function addNewQuestion() {
+            const cat = document.getElementById("newCategoryInput").value.trim().toUpperCase();
+            const title = document.getElementById("newTitleInput").value.trim().toUpperCase();
+            const author = getResolvedAuthor();
+            const optionMode = document.getElementById("optionModeSelect").value;
+            let options = ["SI", "NO", "ABSTENCION"];
+
+            if (optionMode === "custom") {
+                options = parseCustomOptions(document.getElementById("customOptionsInput").value);
+            }
+
+            if (!cat || !title) { showAppNotification("Por favor rellene la categoría y el texto completo de la moción.", "error"); return; }
+
+            showCustomModal("Confirmar envío", "¿Está seguro de publicar la nueva moción al plenario?", (confirmed) => {
+                if (!confirmed) return;
+                let questions = memoryCache.questions || [];
+                const newId = "q_" + Date.now();
+                questions.push({ id: newId, category: cat, title: title, author: author, options: options });
+                
+                dbRef.ref('questions').set(questions);
+                
+                let initialVoteObj = { voters: {} };
+                options.forEach(opt => { initialVoteObj[opt.toLowerCase().trim()] = 0; });
+                dbRef.ref(`votes/${newId}`).set(initialVoteObj);
+                dbRef.ref(`timers/${newId}`).set({ active: false, timeLeft: 90, started: false });
+
+                document.getElementById("newCategoryInput").value = "";
+                document.getElementById("newTitleInput").value = "";
+                document.getElementById("optionModeSelect").value = "default";
+                document.getElementById("customOptionsInput").value = "";
+                document.getElementById("customOptionsGroup").style.display = "none";
+                document.getElementById("authorSelect").value = "Mesa Directiva";
+                document.getElementById("customAuthorInput").value = "";
+                document.getElementById("customAuthorGroup").style.display = "none";
+                cancelEditMode();
+                currentQIndex = questions.length - 1;
+                initTabs();
+                renderAll();
+                showAppNotification("¡Moción publicada correctamente!", "success");
+            }, "Acepto", true);
+        }
+
+        function prepareEditQuestion() {
+            const questions = memoryCache.questions;
+            if (!questions || questions.length === 0) return;
+            const currentQ = questions[currentQIndex];
+            editingQuestionId = currentQ.id;
+            document.getElementById("newCategoryInput").value = currentQ.category;
+            document.getElementById("newTitleInput").value = currentQ.title;
+
+            const isCustom = currentQ.options && !JSON.stringify(currentQ.options).includes("si");
+            if (isCustom) {
+                document.getElementById("optionModeSelect").value = "custom";
+                document.getElementById("customOptionsGroup").style.display = "block";
+                document.getElementById("customOptionsInput").value = currentQ.options.join("\n");
+            } else {
+                document.getElementById("optionModeSelect").value = "default";
+                document.getElementById("customOptionsGroup").style.display = "none";
+                document.getElementById("customOptionsInput").value = "";
+            }
+
+            const authorSelect = document.getElementById("authorSelect");
+            const customGroup = document.getElementById("customAuthorGroup");
+            const customInput = document.getElementById("customAuthorInput");
+
+            if (currentQ.author && currentQ.author !== "MESA DIRECTIVA") {
+                authorSelect.value = "custom";
+                customGroup.style.display = "block";
+                customInput.value = currentQ.author;
+            } else {
+                authorSelect.value = "Mesa Directiva";
+                customGroup.style.display = "none";
+                customInput.value = "";
+            }
+
+            document.getElementById("motionFormTitle").innerText = "⚙️ Editar Moción Actual";
+            
+            const btnContainer = document.getElementById("motionActionButtons");
+            btnContainer.innerHTML = `
+                <button type="button" class="btn-report" style="background-color: #3182CE;" onclick="saveEditedQuestion()">💾 Guardar Cambios</button>
+                <button type="button" class="btn-reset" onclick="cancelEditMode()">❌ Cancelar</button>
+            `;
+        }
+
+        function saveEditedQuestion() {
+            const cat = document.getElementById("newCategoryInput").value.trim().toUpperCase();
+            const title = document.getElementById("newTitleInput").value.trim().toUpperCase();
+            const author = getResolvedAuthor();
+            const optionMode = document.getElementById("optionModeSelect").value;
+            let options = ["SI", "NO", "ABSTENCION"];
+
+            if (optionMode === "custom") {
+                options = parseCustomOptions(document.getElementById("customOptionsInput").value);
+            }
+
+            if (!cat || !title) { showAppNotification("Por favor ingrese la categoría y el texto de la moción.", "error"); return; }
+
+            showCustomModal("Confirmar actualización", "¿Desea guardar los cambios en esta moción?", (confirmed) => {
+                if (!confirmed) return;
+                let questions = memoryCache.questions;
+                const idx = questions.findIndex(q => q.id === editingQuestionId);
+                if (idx !== -1) {
+                    questions[idx].category = cat;
+                    questions[idx].title = title;
+                    questions[idx].author = author;
+                    questions[idx].options = options;
+                    dbRef.ref('questions').set(questions);
+                }
+                
+                cancelEditMode();
+                initTabs();
+                renderAll();
+                showAppNotification("¡Moción actualizada correctamente!", "success");
+            }, "Acepto", true);
+        }
+
+        function cancelEditMode() {
+            editingQuestionId = null;
+            document.getElementById("newCategoryInput").value = "";
+            document.getElementById("newTitleInput").value = "";
+            document.getElementById("optionModeSelect").value = "default";
+            document.getElementById("customOptionsInput").value = "";
+            document.getElementById("customOptionsGroup").style.display = "none";
+            document.getElementById("authorSelect").value = "Mesa Directiva";
+            document.getElementById("customAuthorInput").value = "";
+            document.getElementById("customAuthorGroup").style.display = "none";
+            document.getElementById("motionFormTitle").innerText = "⚙️ Creación de Nueva Moción (Opciones y Textos Extensos)";
+            document.getElementById("motionActionButtons").innerHTML = `
+                <button type="button" class="btn-report" style="background-color: var(--adep-green);" onclick="addNewQuestion()">➕ Publicar Nueva Moción</button>
+            `;
+        }
+
+        function deleteCurrentQuestion() {
+            const questions = memoryCache.questions;
+            if (!questions || questions.length === 0) return;
+
+            showCustomModal("Confirmar eliminación", "¿Está seguro de eliminar esta moción del sistema?", (confirmed) => {
+                if (!confirmed) return;
+                const removedQ = questions.splice(currentQIndex, 1)[0];
+                
+                if (questions.length === 0) {
+                    dbRef.ref('questions').remove();
+                } else {
+                    dbRef.ref('questions').set(questions);
+                }
+
+                if (removedQ) {
+                    dbRef.ref(`votes/${removedQ.id}`).remove();
+                    dbRef.ref(`timers/${removedQ.id}`).remove();
+                    dbRef.ref(`activeSessions/${removedQ.id}`).remove();
+                }
+
+                currentQIndex = Math.max(0, questions.length - 1);
+                cancelEditMode();
+                initTabs();
+                renderAll();
+                showAppNotification("¡Moción eliminada correctamente!", "success");
+            }, "Acepto", true);
+        }
+
+        function requestHelp() {
+            if (!currentUser || currentUser.role === "Mesa Directiva") return;
+            const questions = memoryCache.questions;
+            if (!questions || questions.length === 0) return;
+            const qId = questions[currentQIndex].id;
+
+            showCustomModal("Solicitar Ayuda", "¿Desea enviar una solicitud de asistencia a la Administración para corregir su voto o habilitar su participación?", (confirmed) => {
+                if (!confirmed) return;
+                const helpData = {
+                    name: currentUser.name,
+                    cedula: currentUser.cedula,
+                    filial: currentUser.filial || "N/A",
+                    qId: qId,
+                    qTitle: questions[currentQIndex].category,
+                    timestamp: Date.now()
+                };
+                dbRef.ref(`ayudas/${currentUser.cedula}`).set(helpData).then(() => {
+                    showAppNotification("¡Solicitud enviada a la Administración con éxito!", "success");
+                });
+            }, "Enviar Solicitud", true);
+        }
+
+        function renderAll() {
+            if (!currentUser) return;
+            
+            const isAdmin = (currentUser.role === "Mesa Directiva");
+            const timersDB = memoryCache.timers || {};
+            const questions = memoryCache.questions;
+            const hasMotions = questions && questions.length > 0;
+
+            if (isAdmin) {
+                renderSolicitudesUnificadas();
+                renderCuentasRegistradas();
+                renderCuentasEliminadas();
+            }
+
+            const votingContainer = document.getElementById("votingMainContainer");
+            const noMotionsBox = document.getElementById("noMotionsContainer");
+
+            if (!hasMotions) {
+                votingContainer.style.display = "none";
+                noMotionsBox.style.display = "block";
+                return;
+            } else {
+                votingContainer.style.display = "grid";
+                noMotionsBox.style.display = "none";
+            }
+            if (currentQIndex >= questions.length) currentQIndex = questions.length - 1;
+            const currentQ = questions[currentQIndex];
+            if (!currentQ) return;
+            
+            document.getElementById("qCategory").innerText = currentQ.category;
+            document.getElementById("qTitle").innerText = currentQ.title;
+            document.getElementById("qAuthor").innerHTML = `<span>📌 Generado por: ${currentQ.author || 'MESA DIRECTIVA'}</span>`;
+
+            const timerInfo = timersDB[currentQ.id] || { active: false, timeLeft: 90, started: false };
+
+            document.getElementById("adminTimerStatusText").innerText = timerInfo.active 
+                ? `Estado: Moción ACTIVA (Quedan ${Math.floor(timerInfo.timeLeft/60).toString().padStart(2,'0')}:${(timerInfo.timeLeft%60).toString().padStart(2,'0')})` 
+                : (timerInfo.timeLeft === 0 ? "Estado: Moción CERRADA (Tiempo expirado)" : (timerInfo.started ? `Estado: Moción pausada (${Math.floor(timerInfo.timeLeft/60).toString().padStart(2,'0')}:${(timerInfo.timeLeft%60).toString().padStart(2,'0')})` : "Estado: Moción bloqueada / Inactiva"));
+
+            const adminTimerBtnContainer = document.getElementById("adminTimerButtonsContainer");
+            if (adminTimerBtnContainer) {
+                if (!timerInfo.started) {
+                    adminTimerBtnContainer.innerHTML = `
+                        <button class="btn-report" style="background-color: var(--adep-green);" onclick="adminActivateMotion()">▶️ Activar Moción y Iniciar 1:30</button>
+                    `;
+                } else {
+                    adminTimerBtnContainer.innerHTML = `
+                        <button class="btn-reset" style="background-color: #D69E2E;" id="btnToggleTimer" onclick="adminToggleTimer()">${timerInfo.active ? "⏸️ Detener Tiempo" : "▶️ Reanudar Tiempo"}</button>
+                        <button class="btn-delete" style="background-color: #C53030;" onclick="adminResetTimer()">🔄 Reiniciar 1:30</button>
+                        <button class="btn-report" style="background-color: #4A5568;" onclick="adminFinishMotion()">⏹️ Finalizar Moción</button>
+                    `;
+                }
+            }
+
+            const optionsContainer = document.getElementById("optionsCardContainer");
+            optionsContainer.innerHTML = "";
+            const optionsList = currentQ.options || ["SI", "NO", "ABSTENCION"];
+            const isCustomOpts = optionsList.length !== 3 || (optionsList[0] !== "si" && optionsList[0] !== "SI" && optionsList[0] !== "SÍ");
+
+            const votesDB = memoryCache.votes;
+            const qData = (votesDB && votesDB[currentQ.id]) || { voters: {} };
+            const userId = "user_" + btoa(currentUser.cedula).replace(/=/g, '');
+            const myVote = qData.voters ? qData.voters[userId] : null;
+
+            optionsList.forEach(opt => {
+                const optKey = typeof opt === 'string' ? opt.toLowerCase().trim() : opt;
+                const optDisplay = typeof opt === 'string' ? opt.toUpperCase() : opt;
+                const btn = document.createElement("button");
+                
+                let btnClass = "vote-btn ";
+                if (isCustomOpts) {
+                    btnClass += "custom-opt";
+                } else {
+                    if (optKey === 'si' || optKey === 'sÍ') btnClass += "btn-si";
+                    else if (optKey === 'no') btnClass += "btn-no";
+                    else btnClass += "btn-abs";
+                }
+
+                if (myVote === optKey) btnClass += " selected";
+                btn.className = btnClass;
+                
+                let icon = "👍";
+                if (optKey === 'no') icon = "👎";
+                if (optKey === 'abstencion' || optKey === 'abstención') icon = "✋";
+                if (isCustomOpts) icon = "📌";
+
+                btn.innerHTML = `<span>${optDisplay}</span><span>${icon}</span>`;
+                btn.disabled = isAdmin || !timerInfo.active || timerInfo.timeLeft <= 0 || myVote !== null;
+                btn.onclick = () => castVote(optKey);
+                optionsContainer.appendChild(btn);
+            });
+
+            const statusMsg = document.getElementById("userStatus");
+            const btnHelpRequest = document.getElementById("btnHelpRequest");
+            const btnExpiredHelpRequest = document.getElementById("btnExpiredHelpRequest");
+
+            if (isAdmin) {
+                statusMsg.className = "user-status-msg status-voted";
+                statusMsg.innerText = " Rol Administrador / Administración: Supervisión en tiempo real.";
+                if (btnHelpRequest) btnHelpRequest.style.display = "none";
+                if (btnExpiredHelpRequest) btnExpiredHelpRequest.style.display = "none";
+            } else {
+                document.getElementById("infoAfiliadoName").innerText = currentUser.name.toUpperCase();
+                document.getElementById("infoAfiliadoCedula").innerText = currentUser.cedula || "No registrada";
+                document.getElementById("infoAfiliadoProvincia").innerText = (currentUser.filial || "No especificada").toUpperCase();
+
+                const isTimeExpired = (timerInfo.timeLeft <= 0 && !myVote);
+
+                updateTimerDisplay(timerInfo.timeLeft);
+
+                if (btnHelpRequest) {
+                    btnHelpRequest.style.display = myVote ? "block" : "none";
+                }
+                if (btnExpiredHelpRequest) {
+                    btnExpiredHelpRequest.style.display = isTimeExpired ? "block" : "none";
+                }
+
+                if (!timerInfo.started) {
+                    statusMsg.className = "user-status-msg status-pending";
+                    statusMsg.innerText = "⏳ Esperando a que la Administración active la moción...";
+                    document.getElementById("infoMocionStatus").innerText = "EN ESPERA DE ACTIVACIÓN";
+                    document.getElementById("infoMocionStatus").style.color = "#B45309";
+                } else if (!timerInfo.active && timerInfo.timeLeft > 0) {
+                    statusMsg.className = "user-status-msg status-pending";
+                    statusMsg.innerText = "⏸️ El tiempo ha sido detenido por la Administración.";
+                    document.getElementById("infoMocionStatus").innerText = "TIEMPO PAUSADO";
+                    document.getElementById("infoMocionStatus").style.color = "#B45309";
+                } else if (myVote) {
+                    document.getElementById("timerLabelText").innerText = "⏱️ Estado de sufragio:";
+                    document.getElementById("timerClock").innerText = "VOTACIÓN ENVIADA";
+
+                    statusMsg.className = "user-status-msg status-voted";
+                    statusMsg.innerText = `✓ ¡Éxito, ya votaste! Su sufragio ha sido registrado con éxito.`;
+                    document.getElementById("infoMocionStatus").innerText = `VOTO EMITIDO (${myVote.toUpperCase()})`;
+                    document.getElementById("infoMocionStatus").style.color = "var(--adep-green)";
+                } else if (isTimeExpired) {
+                    document.getElementById("timerLabelText").innerText = "⏱️ Tiempo de votación:";
+                    document.getElementById("timerClock").innerText = "CERRADA";
+
+                    statusMsg.className = "user-status-msg status-voted";
+                    statusMsg.style.backgroundColor = "#FED7D7";
+                    statusMsg.style.color = "#C53030";
+                    statusMsg.style.border = "1px solid #FEB2B2";
+                    statusMsg.innerText = "⚠️ La moción se ha cerrado automáticamente porque el tiempo ha expirado.";
+                    
+                    document.getElementById("infoMocionStatus").innerText = "MOCIÓN CERRADA / EXPIRADA";
+                    document.getElementById("infoMocionStatus").style.color = "var(--adep-red)";
+                } else {
+                    document.getElementById("timerLabelText").innerText = "⏱️ Tiempo restante para votar:";
+                    statusMsg.className = "user-status-msg status-pending";
+                    statusMsg.style.backgroundColor = "";
+                    statusMsg.style.color = "";
+                    statusMsg.style.border = "";
+                    statusMsg.innerText = "Pendiente: Seleccione su opción para votar.";
+                    document.getElementById("infoMocionStatus").innerText = "PENDIENTE DE VOTO";
+                    document.getElementById("infoMocionStatus").style.color = "var(--adep-red)";
+                }
+            }
+
+            if (isAdmin) {
+                renderAdminStats(currentQ, qData, isCustomOpts, optionsList);
+                renderAuditTable(qData.voters || {}, isCustomOpts);
+            }
+        }
+
+        function updateTimerDisplay(secondsLeft) {
+            const clockElem = document.getElementById("timerClock");
+            if (!clockElem) return;
+            const minutes = Math.floor(secondsLeft / 60);
+            const seconds = secondsLeft % 60;
+            clockElem.innerText = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+        }
+
+        function renderAdminStats(currentQ, qData, isCustomOpts, optionsList) {
+            const container = document.getElementById("adminStatsContainer");
+            container.innerHTML = "";
+            let total = 0;
+
+            optionsList.forEach(opt => {
+                const optKey = typeof opt === 'string' ? opt.toLowerCase().trim() : opt;
+                total += (qData[optKey] || 0);
+            });
+
+            const btnResetVotes = document.getElementById("btnResetVotes");
+            if (btnResetVotes) {
+                btnResetVotes.disabled = (total === 0);
+            }
+
+            optionsList.forEach(opt => {
+                const optKey = typeof opt === 'string' ? opt.toLowerCase().trim() : opt;
+                const optDisplay = typeof opt === 'string' ? opt.toUpperCase() : opt;
+                const count = qData[optKey] || 0;
+                const pct = total > 0 ? ((count / total) * 100).toFixed(1) : "0.0";
+
+                let barColorClass = "fill-custom";
+                let textColor = "#2B6CB0";
+                if (!isCustomOpts) {
+                    if (optKey === 'si' || optKey === 'sÍ') { barColorClass = "fill-si"; textColor = "var(--adep-green)"; }
+                    else if (optKey === 'no') { barColorClass = "fill-no"; textColor = "var(--adep-red)"; }
+                    else { barColorClass = "fill-abs"; textColor = "#64748B"; }
+                }
+
+                const statBox = document.createElement("div");
+                statBox.className = "stat-box";
+                statBox.innerHTML = `
+                    <div class="stat-header"><span style="color: ${textColor};">${optDisplay}</span><span>${isVotesMasked ? '***' : count + ' votos (' + pct + '%)'}</span></div>
+                    <div class="stat-bar-bg"><div class="stat-bar-fill ${barColorClass}" style="width: ${pct}%;"></div></div>
+                `;
+                container.appendChild(statBox);
+            });
+
+            document.getElementById("quorumBadge").innerText = `Votos Registrados: ${isVotesMasked ? '***' : total}`;
+            document.getElementById("totalVotes").innerText = `Total Votos Emitidos: ${isVotesMasked ? '***' : total}`;
+            updateChart(optionsList, qData, isCustomOpts);
+        }
+
+        function renderCuentasRegistradas() {
+            const tbody = document.getElementById("cuentasRegistradasTableBody");
+            if (!tbody) return;
+            tbody.innerHTML = "";
+
+            const usersMap = memoryCache.users || {};
+            const searchVal = document.getElementById("searchAccountInput") ? document.getElementById("searchAccountInput").value.toLowerCase() : "";
+
+            let usersArray = Object.values(usersMap).filter(u => u && u.role !== "Mesa Directiva");
+
+            if (searchVal) {
+                usersArray = usersArray.filter(u => 
+                    (u.name && u.name.toLowerCase().includes(searchVal)) || 
+                    (u.cedula && u.cedula.toLowerCase().includes(searchVal))
+                );
+            }
+
+            if (usersArray.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; color:#718096; padding: 15px;">No se encontraron cuentas de afiliados.</td></tr>`;
+                return;
+            }
+
+            const activeSessionsDB = memoryCache.activeSessions || {};
+            let activeCedulasInPlenary = {};
+            Object.keys(activeSessionsDB).forEach(qId => {
+                if (activeSessionsDB[qId]) {
+                    Object.keys(activeSessionsDB[qId]).forEach(ced => {
+                        activeCedulasInPlenary[ced] = true;
+                    });
+                }
+            });
+
+            let htmlContent = "";
+            usersArray.forEach(u => {
+                const isConnected = activeCedulasInPlenary[u.cedula] ? true : false;
+                const badgeClass = isConnected ? "badge-activo" : "badge-inactivo";
+                const badgeText = isConnected ? "🟢 Conectado" : "⚪ Inactivo";
+
+                htmlContent += `
+                    <tr>
+                        <td><strong>${(u.name || '').toUpperCase()}</strong></td>
+                        <td>${u.cedula}</td>
+                        <td>${(u.filial || 'N/A').toUpperCase()}</td>
+                        <td>${u.role || 'Afiliado'}</td>
+                        <td><span class="badge-voto ${badgeClass}">${badgeText}</span></td>
+                        <td>
+                            <button class="btn-report" style="padding: 4px 8px; font-size: 0.75rem; background-color: #3182CE;" onclick="openAdminEditAccount('${u.cedula}')">✏️ Editar</button>
+                            <button class="btn-delete" style="padding: 4px 8px; font-size: 0.75rem;" onclick="adminDeleteAccount('${u.cedula}', '${u.name}')">🗑️ Eliminar</button>
+                        </td>
+                    </tr>
+                `;
+            });
+
+            tbody.innerHTML = htmlContent;
+        }
+
+        function renderCuentasEliminadas() {
+            const tbody = document.getElementById("cuentasEliminadasTableBody");
+            if (!tbody) return;
+            tbody.innerHTML = "";
+
+            const deletedMap = memoryCache.deletedUsers || {};
+            const deletedArray = Object.values(deletedMap);
+
+            if (deletedArray.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="5" style="text-align:center; color:#718096; padding: 15px;">No hay cuentas eliminadas en la papelera.</td></tr>`;
+                return;
+            }
+
+            let htmlContent = "";
+            deletedArray.forEach(u => {
+                const dateStr = u.deletedAt ? new Date(u.deletedAt).toLocaleString() : "N/A";
+                htmlContent += `
+                    <tr>
+                        <td><strong>${(u.name || '').toUpperCase()}</strong></td>
+                        <td>${u.cedula}</td>
+                        <td>${(u.filial || 'N/A').toUpperCase()}</td>
+                        <td>${dateStr}</td>
+                        <td>
+                            <button class="btn-report" style="padding: 4px 8px; font-size: 0.75rem; background-color: #D69E2E;" onclick="adminRestoreAccount('${u.cedula}', '${u.name}')">♻️ Restablecer</button>
+                            <button class="btn-delete" style="padding: 4px 8px; font-size: 0.75rem; background-color: #718096;" onclick="adminPermanentDeleteAccount('${u.cedula}', '${u.name}')">🗑️ Borrar Definitivo</button>
+                        </td>
+                    </tr>
+                `;
+            });
+
+            tbody.innerHTML = htmlContent;
+        }
+
+        function renderSolicitudesUnificadas() {
+            const tbody = document.getElementById("solicitudesTableBody");
+            if (!tbody) return;
+            tbody.innerHTML = "";
+            
+            const solicitudesNuevas = memoryCache.solicitantes || {};
+            const solicitudesPerfil = memoryCache.solicitudesPerfil || {};
+            
+            let htmlContent = "";
+
+            Object.keys(solicitudesNuevas).forEach(cedula => {
+                const sol = solicitudesNuevas[cedula];
+                htmlContent += `
+                    <tr>
+                        <td><span class="badge-voto badge-custom">Nueva Cuenta</span></td>
+                        <td><strong>${(sol.name || '').toUpperCase()}</strong></td>
+                        <td>${sol.cedula}</td>
+                        <td>${(sol.filial || '').toUpperCase()}</td>
+                        <td>
+                            <button class="btn-report" style="padding: 4px 8px; font-size: 0.75rem;" onclick="aprobarSolicitudNueva('${cedula}')">✔️ Aceptar</button>
+                            <button class="btn-delete" style="padding: 4px 8px; font-size: 0.75rem;" onclick="denegarSolicitudNueva('${cedula}')">❌ Denegar</button>
+                        </td>
+                    </tr>
+                `;
+            });
+
+            Object.keys(solicitudesPerfil).forEach(cedula => {
+                const sol = solicitudesPerfil[cedula];
+                htmlContent += `
+                    <tr>
+                        <td><span class="badge-voto badge-profile">Actualizar Datos</span></td>
+                        <td>Anterior: ${(sol.currentName || '').toUpperCase()}<br><strong>Nuevo: ${(sol.newName || '').toUpperCase()}</strong></td>
+                        <td>${sol.cedula}</td>
+                        <td>${(sol.newFilial || '').toUpperCase()}</td>
+                        <td>
+                            <button class="btn-report" style="padding: 4px 8px; font-size: 0.75rem;" onclick="aprobarSolicitudPerfil('${cedula}')">✔️ Aceptar</button>
+                            <button class="btn-delete" style="padding: 4px 8px; font-size: 0.75rem;" onclick="denegarSolicitudPerfil('${cedula}')">❌ Denegar</button>
+                        </td>
+                    </tr>
+                `;
+            });
+
+            if (htmlContent === "") {
+                tbody.innerHTML = `<tr><td colspan="5" style="text-align:center; color:#718096; padding: 15px;">No hay solicitudes pendientes.</td></tr>`;
+            } else {
+                tbody.innerHTML = htmlContent;
+            }
+        }
+
+        function aprobarSolicitudNueva(cedula) {
+            const sol = memoryCache.solicitantes[cedula];
+            if (!sol) return;
+            
+            const newUser = { name: (sol.name || '').toUpperCase(), cedula: sol.cedula, filial: (sol.filial || '').toUpperCase(), pin: "1234", role: "Afiliado" };
+            
+            dbRef.ref('users').once('value').then(snap => {
+                let cleanMap = normalizeUsersToMap(snap.val());
+                cleanMap[cedula] = newUser;
+
+                const updates = {};
+                updates[`users`] = cleanMap;
+                updates[`solicitudes/${cedula}`] = null;
+
+                dbRef.ref().update(updates).then(() => {
+                    if (memoryCache.solicitantes && memoryCache.solicitantes[cedula]) {
+                        delete memoryCache.solicitantes[cedula];
+                    }
+                    memoryCache.users = cleanMap;
+                    renderAll();
+                    showAppNotification(`¡Cuenta de ${sol.name} aceptada con éxito! Ya puede ingresar sin solicitudes pendientes.`, "success");
+                });
+            });
+        }
+
+        function denegarSolicitudNueva(cedula) {
+            dbRef.ref(`solicitudes/${cedula}`).remove().then(() => {
+                showAppNotification("Solicitud de cuenta denegada.", "success");
+            });
+        }
+
+        function aprobarSolicitudPerfil(cedula) {
+            const sol = memoryCache.solicitudesPerfil[cedula];
+            if (!sol) return;
+            dbRef.ref('users').once('value').then(snapshot => {
+                let cleanMap = normalizeUsersToMap(snapshot.val());
+                let userObj = cleanMap[cedula] || { cedula: cedula, role: "Afiliado", pin: "1234" };
+                userObj.name = (sol.newName || '').toUpperCase();
+                userObj.filial = (sol.newFilial || '').toUpperCase();
+                cleanMap[cedula] = userObj;
+
+                const updates = {};
+                updates[`users`] = cleanMap;
+                updates[`solicitudesPerfil/${cedula}`] = null;
+
+                dbRef.ref().update(updates).then(() => {
+                    memoryCache.users = cleanMap;
+                    showAppNotification(`Datos de ${sol.newName} actualizados correctamente.`, "success");
+                });
+            });
+        }
+
+        function denegarSolicitudPerfil(cedula) {
+            dbRef.ref(`solicitudesPerfil/${cedula}`).remove().then(() => {
+                showAppNotification("Solicitud de actualización de datos denegada.", "success");
+            });
+        }
+
+        function renderAuditTable(voters, isCustomOpts) {
+            const tbody = document.getElementById("auditTableBody");
+            if (!tbody) return;
+            tbody.innerHTML = "";
+            const usersMap = memoryCache.users || {};
+            const questions = memoryCache.questions;
+            const currentQ = questions[currentQIndex];
+            const qId = currentQ ? currentQ.id : null;
+            const ayudasDB = memoryCache.ayudas || {};
+            const activeSessionsDB = (qId && memoryCache.activeSessions && memoryCache.activeSessions[qId]) || {};
+            const timersDB = memoryCache.timers || {};
+            const timerInfo = timersDB[qId] || { timeLeft: 90 };
+
+            let usersArray = Object.values(usersMap).filter(u => u && u.role !== "Mesa Directiva");
+
+            const filteredAfiliados = usersArray.filter(u => {
+                const voterId = "user_" + btoa(u.cedula).replace(/=/g, '');
+                const hasVoted = voters && voters[voterId];
+                const isExpired = (timerInfo.timeLeft <= 0 && !hasVoted);
+                const hasHelp = ayudasDB[u.cedula];
+                const hasLoggedInSession = activeSessionsDB[u.cedula];
+
+                return hasVoted || hasHelp || (isExpired && hasLoggedInSession);
+            });
+
+            if (filteredAfiliados.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="5" style="text-align:center; color:#718096; padding: 25px;">No hay registros aún. Los asambleístas aparecerán aquí cuando participen o expiren en esta moción.</td></tr>`;
+                return;
+            }
+
+            filteredAfiliados.forEach(voter => {
+                const voterId = "user_" + btoa(voter.cedula).replace(/=/g, '');
+                const voteVal = voters && voters[voterId] ? voters[voterId].toLowerCase().trim() : null;
+                const voteDisplay = voteVal ? voteVal.toUpperCase() : null;
+                const hasHelp = ayudasDB[voter.cedula];
+                const isExpired = (timerInfo.timeLeft <= 0 && !voteVal);
+                
+                let badgeHTML = "";
+                let actionHTML = "";
+
+                if (hasHelp) {
+                    badgeHTML = `<span class="badge-voto badge-help">🆘 SOLICITUD DE AYUDA</span>`;
+                    actionHTML = `<button class="btn-enable-vote" onclick="atenderAyuda('${voter.cedula}', '${voter.name}')">🛠️ Atender y Habilitar</button>`;
+                } else if (voteVal) {
+                    let badgeClass = "badge-custom";
+                    if (!isCustomOpts) {
+                        if (voteVal === 'si' || voteVal === 'sÍ') badgeClass = "badge-si";
+                        else if (voteVal === 'no') badgeClass = "badge-no";
+                        else badgeClass = "badge-abs";
+                    }
+                    badgeHTML = `<span class="badge-voto ${badgeClass}">${isVotesMasked ? '*' : voteDisplay}</span>`;
+                    actionHTML = `<button class="btn-delete-vote" onclick="confirmDeleteVote('${voterId}', '${voter.cedula}', '${voter.name}')">🗑️ Borrar Voto</button>`;
+                } else if (isExpired) {
+                    badgeHTML = `<span class="badge-voto badge-expired">⚠️ TIEMPO EXPIRADO (Sin Votar)</span>`;
+                    actionHTML = `<button class="btn-enable-vote" onclick="confirmEnableVoter('${voter.cedula}', '${voter.name}')">🔓 Permitir Votar</button>`;
+                }
+
+                const tr = document.createElement("tr");
+                tr.innerHTML = `
+                    <td><strong>${(voter.name || '').toUpperCase()}</strong></td>
+                    <td>${voter.cedula || 'N/A'}</td>
+                    <td>${(voter.filial || 'N/A').toUpperCase()}</td>
+                    <td>${badgeHTML}</td>
+                    <td>${actionHTML}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function atenderAyuda(voterCedula, voterName) {
+            showCustomModal("Atender Solicitud de Ayuda", `¿Desea atender la solicitud de ${voterName}, eliminar sus restricciones y permitirle volver a votar?`, (confirmed) => {
+                if (!confirmed) return;
+                const questions = memoryCache.questions;
+                const qId = questions[currentQIndex].id;
+
+                dbRef.ref(`votes/${qId}`).once('value').then(snapshot => {
+                    let qData = snapshot.val() || { voters: {} };
+                    const voterId = "user_" + btoa(voterCedula).replace(/=/g, '');
+                    if (qData.voters && qData.voters[voterId]) {
+                        delete qData.voters[voterId];
+                        const currentQ = questions[currentQIndex];
+                        const opts = currentQ.options || ["SI", "NO", "ABSTENCION"];
+                        opts.forEach(o => { qData[o.toLowerCase().trim()] = 0; });
+                        Object.keys(qData.voters).forEach(vKey => {
+                            const vOpt = qData.voters[vKey];
+                            if (vOpt && qData[vOpt] !== undefined) qData[vOpt] += 1;
+                        });
+                        dbRef.ref(`votes/${qId}`).set(qData);
+                    }
+                    dbRef.ref(`timers/${qId}`).update({ active: true, timeLeft: 90, started: true });
+                    dbRef.ref(`ayudas/${voterCedula}`).remove().then(() => {
+                        renderAll();
+                        showAppNotification(`Se ha atendido la solicitud de ${voterName}.`, "success");
+                    });
+                });
+            }, "Acepto", true);
+        }
+
+        function confirmDeleteVote(voterId, voterCedula, voterName) {
+            showCustomModal("Eliminar Voto", `¿Está seguro de eliminar el voto de ${voterName}? Podrá votar de nuevo.`, (confirmed) => {
+                if (!confirmed) return;
+                const questions = memoryCache.questions;
+                const qId = questions[currentQIndex].id;
+                
+                dbRef.ref(`votes/${qId}`).once('value').then(snapshot => {
+                    let qData = snapshot.val() || { voters: {} };
+                    if (qData.voters && qData.voters[voterId]) {
+                        delete qData.voters[voterId];
+                        
+                        const currentQ = questions[currentQIndex];
+                        const opts = currentQ.options || ["SI", "NO", "ABSTENCION"];
+                        opts.forEach(o => { qData[o.toLowerCase().trim()] = 0; });
+                        Object.keys(qData.voters).forEach(vKey => {
+                            const vOpt = qData.voters[vKey];
+                            if (vOpt && qData[vOpt] !== undefined) qData[vOpt] += 1;
+                        });
+
+                        dbRef.ref(`votes/${qId}`).set(qData).then(() => {
+                            renderAll();
+                            showAppNotification(`Se ha borrado el voto de ${voterName}.`, "success");
+                        });
+                    }
+                });
+            }, "Acepto", true);
+        }
+
+        function confirmEnableVoter(voterCedula, voterName) {
+            showCustomModal("Habilitar Afiliado", `¿Desea restablecer el tiempo y permitir que ${voterName} vuelva a votar?`, (confirmed) => {
+                if (!confirmed) return;
+                const questions = memoryCache.questions;
+                const qId = questions[currentQIndex].id;
+
+                dbRef.ref(`timers/${qId}`).update({ active: true, timeLeft: 90, started: true });
+                dbRef.ref(`activeSessions/${qId}/${voterCedula}`).remove();
+                renderAll();
+                showAppNotification(`Se ha habilitado nuevamente el tiempo para ${voterName}.`, "success");
+            }, "Acepto", true);
+        }
+
+        function castVote(option) {
+            if (currentUser.role === "Mesa Directiva" || memoryCache.questions.length === 0) return;
+            
+            showCustomModal("Confirmar Voto", `¿Está seguro de emitir su voto por: ${option.toUpperCase()}?`, (confirmed) => {
+                if (!confirmed) return;
+
+                const userId = "user_" + btoa(currentUser.cedula).replace(/=/g, '');
+                const questions = memoryCache.questions;
+                const qId = questions[currentQIndex].id;
+
+                dbRef.ref(`votes/${qId}`).once('value').then(snapshot => {
+                    let qData = snapshot.val() || { voters: {} };
+                    if (!qData.voters) qData.voters = {};
+
+                    qData.voters[userId] = option;
+
+                    const currentQ = questions[currentQIndex];
+                    const opts = currentQ.options || ["SI", "NO", "ABSTENCION"];
+                    opts.forEach(o => { qData[o.toLowerCase().trim()] = 0; });
+
+                    Object.keys(qData.voters).forEach(vKey => {
+                        const vOpt = qData.voters[vKey];
+                        if (vOpt && qData[vOpt] !== undefined) {
+                            qData[vOpt] += 1;
+                        }
+                    });
+
+                    dbRef.ref(`votes/${qId}`).set(qData).then(() => {
+                        dbRef.ref(`activeSessions/${qId}/${currentUser.cedula}`).remove();
+                        dbRef.ref(`ayudas/${currentUser.cedula}`).remove();
+                        renderAll();
+                        showAppNotification(`¡Voto registrado con éxito (${option.toUpperCase()})!`, "success");
+                    });
+                });
+            }, "Confirmar Voto", true);
+        }
+
+        function resetCurrentVotes() {
+            const questions = memoryCache.questions;
+            if (questions.length === 0) return;
+            showCustomModal("Confirmar reinicio", "¿Está seguro de reiniciar a 0 los votos de esta moción?", (confirmed) => {
+                if (!confirmed) return;
+                const qId = questions[currentQIndex].id;
+                const currentQ = questions[currentQIndex];
+                let resetObj = { voters: {} };
+                const opts = currentQ.options || ["SI", "NO", "ABSTENCION"];
+                opts.forEach(o => { resetObj[o.toLowerCase().trim()] = 0; });
+
+                dbRef.ref(`votes/${qId}`).set(resetObj).then(() => {
+                    dbRef.ref(`timers/${qId}`).set({ active: false, timeLeft: 90, started: false });
+                    dbRef.ref(`activeSessions/${qId}`).remove();
+                    renderAll();
+                    showAppNotification("Votos de la moción reiniciados a 0.", "success");
+                });
+            }, "Acepto", true);
+        }
+
+        function generatePdfReport(visibility) {
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF({ unit: 'mm', format: 'a4' });
+            const questions = memoryCache.questions;
+            if (!questions || questions.length === 0) return;
+
+            const currentQ = questions[currentQIndex];
+            const votesDB = memoryCache.votes;
+            const qData = (votesDB && votesDB[currentQ.id]) || { voters: {} };
+            const opts = currentQ.options || ["SI", "NO", "ABSTENCION"];
+            
+            let total = 0;
+            opts.forEach(o => { total += (qData[o.toLowerCase().trim()] || 0); });
+
+            doc.setDrawColor(0, 135, 62);
+            doc.setLineWidth(0.8);
+            doc.rect(8, 8, 194, 281);
+            doc.setDrawColor(227, 27, 35);
+            doc.setLineWidth(0.3);
+            doc.rect(9.5, 9.5, 191, 278);
+
+            doc.setFillColor(0, 135, 62);
+            doc.rect(10, 10, 190, 22, "F");
+            doc.setFillColor(227, 27, 35);
+            doc.rect(10, 32, 190, 2.5, "F");
+
+            const logoImg = new Image();
+            logoImg.crossOrigin = "Anonymous";
+            logoImg.src = "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTEOONBRhmPrMlxu-7KhLL73j9GkvgOf7k4esek3AhPDC2WbUT_r3tladt8&s=10";
+            
+            logoImg.onload = function () {
+                doc.addImage(logoImg, 'PNG', 14, 11, 20, 20);
+                finishPdf();
+            };
+            logoImg.onerror = function () {
+                finishPdf();
+            };
+
+            function finishPdf() {
+                doc.setTextColor(255, 255, 255);
+                doc.setFont("helvetica", "bold");
+                doc.setFontSize(11);
+                doc.text("ASOCIACIÓN DE EDUCADORES PENSIONADOS (ADEP)", 108, 18, { align: "center" });
+                doc.setFontSize(8.5);
+                doc.setFont("helvetica", "normal");
+                doc.text("Sistema Oficial de Registro Electoral y Asambleas Plenarias", 108, 24, { align: "center" });
+
+                doc.setTextColor(0, 92, 42);
+                doc.setFont("helvetica", "bold");
+                doc.setFontSize(13);
+                doc.text("ACTA DE ESCRUTINIO Y RESULTADOS DE VOTACIÓN", 105, 42, { align: "center" });
+
+                doc.setFillColor(248, 250, 252);
+                doc.setDrawColor(203, 213, 224);
+                doc.roundedRect(14, 46, 182, 34, 3, 3, "FD");
+
+                doc.setFontSize(8.5);
+                doc.setFont("helvetica", "bold");
+                doc.setTextColor(45, 55, 72);
+                doc.text("Código Moción:", 18, 53);
+                doc.text("Fecha / Hora:", 18, 60);
+                doc.text("Modalidad Documento:", 18, 67);
+                doc.text("Emitido Por:", 18, 74);
+
+                doc.setFont("helvetica", "normal");
+                doc.text(currentQ.id || "N/A", 58, 53);
+                doc.text(new Date().toLocaleString(), 58, 60);
+                doc.setFont("helvetica", "bold");
+                doc.setTextColor(visibility === 'public' ? 0 : 227, visibility === 'public' ? 135 : 27, visibility === 'public' ? 62 : 35);
+                doc.text(visibility === 'public' ? "PÚBLICO (Desglose Nominal de Asambleístas)" : "PRIVADO (Resumen Ejecutivo / Anónimo)", 58, 67);
+                doc.setFont("helvetica", "normal");
+                doc.setTextColor(45, 55, 72);
+                doc.text("Panel de Control ADEP - Asistente Cloud", 58, 74);
+
+                doc.setFont("helvetica", "bold");
+                doc.setFontSize(10);
+                doc.setTextColor(0, 92, 42);
+                doc.text("1. Detalle de la Moción Sometida a Plenario", 14, 88);
+
+                doc.setFontSize(8.5);
+                doc.setFont("helvetica", "bold");
+                doc.setTextColor(227, 27, 35);
+                doc.text(`Categoría: ${currentQ.category}`, 14, 94);
+                
+                doc.setFont("helvetica", "normal");
+                doc.setTextColor(45, 55, 72);
+                let textLines = doc.splitTextToSize(`Texto de la Propuesta: ${currentQ.title}`, 182);
+                doc.text(textLines, 14, 100);
+
+                let nextY = 100 + (textLines.length * 4.5) + 6;
+
+                doc.setFont("helvetica", "bold");
+                doc.setFontSize(10);
+                doc.setTextColor(0, 92, 42);
+                doc.text("2. Resumen Estadístico del Escrutinio", 14, nextY);
+                nextY += 6;
+
+                opts.forEach(o => {
+                    const optKey = o.toLowerCase().trim();
+                    const count = qData[optKey] || 0;
+                    const pct = total > 0 ? parseFloat(((count / total) * 100).toFixed(1)) : 0;
+
+                    doc.setFillColor(241, 245, 249);
+                    doc.setDrawColor(203, 213, 224);
+                    doc.roundedRect(14, nextY, 182, 8, 2, 2, "FD");
+
+                    doc.setFontSize(8.5);
+                    doc.setFont("helvetica", "bold");
+                    doc.setTextColor(45, 55, 72);
+                    doc.text(o.toUpperCase(), 18, nextY + 5.5);
+
+                    doc.text(`${count} votos (${pct.toFixed(1)}%)`, 185, nextY + 5.5, { align: "right" });
+
+                    if (pct > 0) {
+                        doc.setFillColor(0, 135, 62);
+                        doc.rect(75, nextY + 2.5, (pct * 0.55), 3, "F");
+                    }
+
+                    nextY += 10;
+                });
+
+                doc.setFillColor(232, 245, 233);
+                doc.setDrawColor(0, 135, 62);
+                doc.roundedRect(14, nextY, 182, 8, 2, 2, "FD");
+                doc.setFont("helvetica", "bold");
+                doc.setTextColor(0, 92, 42);
+                doc.text("TOTAL DE SUFRAGIOS EMITIDOS:", 18, nextY + 5.5);
+                doc.text(`${total} Asambleístas`, 185, nextY + 5.5, { align: "right" });
+
+                nextY += 14;
+
+                if (visibility === 'public') {
+                    doc.setFont("helvetica", "bold");
+                    doc.setFontSize(10);
+                    doc.setTextColor(0, 92, 42);
+                    doc.text("3. Padrón y Voto Nominativo de Asambleístas", 14, nextY);
+                    nextY += 4;
+
+                    const usersMap = memoryCache.users || {};
+                    const voters = qData.voters || {};
+                    let tableData = [];
+
+                    Object.values(usersMap).forEach(u => {
+                        if (!u || u.role === "Mesa Directiva") return;
+                        const vId = "user_" + btoa(u.cedula).replace(/=/g, '');
+                        if (voters[vId]) {
+                            tableData.push([u.name, u.cedula || 'N/A', u.filial || 'N/A', voters[vId].toUpperCase()]);
+                        }
+                    });
+
+                    if (tableData.length > 0 && typeof doc.autoTable === 'function') {
+                        doc.autoTable({
+                            startY: nextY,
+                            head: [['Asambleísta / Afiliado', 'Cédula', 'Filial', 'Voto Emitido']],
+                            body: tableData,
+                            margin: { left: 14, right: 14 },
+                            theme: 'striped',
+                            headStyles: { fillColor: [0, 135, 62], textColor: [255, 255, 255], fontStyle: 'bold' },
+                            styles: { fontSize: 8, cellPadding: 2 }
+                        });
+                        nextY = doc.lastAutoTable.finalY + 18;
+                    } else {
+                        doc.setFont("helvetica", "italic");
+                        doc.setFontSize(8.5);
+                        doc.setTextColor(113, 128, 150);
+                        doc.text("No se registraron votos de afiliados individuales en esta moción.", 14, nextY + 5);
+                        nextY += 14;
+                    }
+                } else {
+                    doc.setFillColor(254, 243, 199);
+                    doc.setDrawColor(252, 211, 77);
+                    doc.roundedRect(14, nextY, 182, 10, 2, 2, "FD");
+                    doc.setFont("helvetica", "italic");
+                    doc.setFontSize(8);
+                    doc.setTextColor(180, 83, 9);
+                    doc.text("Nota: La información nominativa de cada afiliado ha sido omitida en cumplimiento del carácter privado de este reporte.", 18, nextY + 6);
+                    nextY += 20;
+                }
+
+                if (nextY > 235) { doc.addPage(); nextY = 30; }
+
+                doc.setDrawColor(160, 174, 192);
+                doc.setLineWidth(0.4);
+                doc.line(30, nextY + 12, 85, nextY + 12);
+                doc.line(125, nextY + 12, 180, nextY + 12);
+
+                doc.setFont("helvetica", "bold");
+                doc.setFontSize(8);
+                doc.setTextColor(45, 55, 72);
+                doc.text("PRESIDENTE /A MESA DIRECTIVA", 57.5, nextY + 16, { align: "center" });
+                doc.text("SECRETARIO /A MESA DIRECTIVA", 152.5, nextY + 16, { align: "center" });
+
+                doc.setFont("helvetica", "normal");
+                doc.setFontSize(7);
+                doc.setTextColor(113, 128, 150);
+                doc.text("ADEP Costa Rica", 57.5, nextY + 20, { align: "center" });
+                doc.text("ADEP Costa Rica", 152.5, nextY + 20, { align: "center" });
+
+                doc.save(`Acta_Oficial_ADEP_${currentQ.id}_${visibility}.pdf`);
+                showAppNotification("¡Acta institucional en PDF descargada exitosamente!", "success");
+            }
+        }
+
+        function updateChart(optionsList, qData, isCustomOpts) {
+            const canvas = document.getElementById('resultsChart');
+            if (!canvas) return;
+            const ctx = canvas.getContext('2d');
+            if (chartInstance) { chartInstance.destroy(); }
+
+            let labels = [];
+            let dataVals = [];
+            let bgColors = [];
+
+            optionsList.forEach((opt) => {
+                const optKey = typeof opt === 'string' ? opt.toLowerCase().trim() : opt;
+                labels.push(typeof opt === 'string' ? opt.toUpperCase() : opt);
+                dataVals.push(qData[optKey] || 0);
+
+                if (isCustomOpts) {
+                    bgColors.push('#3182CE');
+                } else {
+                    if (optKey === 'si' || optKey === 'sÍ') bgColors.push('#00873E');
+                    else if (optKey === 'no') bgColors.push('#E31B23');
+                    else bgColors.push('#64748B');
+                }
+            });
+
+            chartInstance = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        data: dataVals,
+                        backgroundColor: bgColors,
+                        borderWidth: 2,
+                        borderColor: '#ffffff'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    animation: false,
+                    transitions: {
+                        active: { animation: { duration: 0 } }
+                    },
+                    plugins: { legend: { position: 'bottom' } }
+                }
+            });
+        }
+
+        checkSession();
+    </script>
+</body>
+</html>
